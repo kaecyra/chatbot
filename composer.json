@@ -1,0 +1,27 @@
+{
+    "name": "kaecyra/chatbot",
+    "description": "General purpose extensible chat bot for Instant Messaging.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Tim Gunter",
+            "email": "tim@vanillaforums.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.0",
+        "kaecyra/app-common": "^0.9",
+        "vanilla/garden-schema": "^1.4",
+        "vanilla/garden-container": "^2.0",
+        "vanilla/garden-http": "^1.1",
+        "vanilla/garden-cli": "~1.0",
+        "ratchet/pawl": "0.2.*",
+        "react/zmq": "0.2.*|0.3.*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Kaecyra\\ChatBot\\": "src"
+        }
+    }
+}

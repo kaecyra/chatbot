@@ -1,0 +1,11 @@
+/vendor/
+/addons/
+/log/
+/conf/conf.d/
+.project
+.settings
+.buildpath
+.idea/*
+.DS_Store
+Thumbs.db
+composer.lock
