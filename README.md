@@ -1,6 +1,9 @@
 ChatBot
 ======
 
+[![Packagist Version](https://img.shields.io/packagist/v/kaecyra/chatbot.svg?style=flat)](https://packagist.org/packages/kaecyra/chatbot)
+![MIT License](https://img.shields.io/packagist/l/kaecyra/chatbot.svg?style=flat)
+
 `chatbot` is a PHP powered asynchronous robot designed to join company instant messaging rooms and provide
 useful and humorous commands and responses.
 
