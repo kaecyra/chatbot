@@ -9,6 +9,7 @@ namespace Kaecyra\ChatBot;
 
 use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
+use Kaecyra\ChatBot\Client\ClientInterface;
 
 use Garden\Daemon\Daemon;
 use Garden\Daemon\AppInterface;
@@ -25,12 +26,16 @@ use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
 use Kaecyra\AppCommon\Addon\AddonManager;
 use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
+Use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LogLevel;
+
+use React\EventLoop\LoopInterface;
+use React\EventLoop\Factory as EventLoopFactory;
 
 /**
  * Payload Context
@@ -105,8 +110,7 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         }
 
         if (posix_getuid() != 0) {
-            echo "Must be root.\n";
-            exit;
+            die(APP." requires root.\n");
         }
 
         // Report and track all errors
@@ -127,7 +131,9 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         $container
             ->rule(ContainerInterface::class)
             ->addAlias(Container::class)
-            ->setInstance(Container::class, $container)
+            ->setClass(Container::class)
+
+            ->setInstance(ContainerInterface::class, $container)
 
             ->defaultRule()
             ->setShared(true)
@@ -143,6 +149,9 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
 
             ->rule(EventAwareInterface::class)
             ->addCall('setEventManager')
+
+            ->rule(TaggedLogInterface::class)
+            ->addCall('setDefaultLogCallback')
 
             ->rule(AddonManager::class)
             ->setConstructorArgs([new Reference([AbstractConfig::class, 'addons.scan'])])
@@ -169,6 +178,27 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
 
         $logger->disableLogger('persist');
         $container->setInstance(LoggerInterface::class, $logger);
+
+        // Set up app interface
+        $container
+            ->rule(AppInterface::class)
+            ->setClass(self::class)
+            ->setShared(true);
+
+        // Set up loop
+        $container
+            ->rule(LoopInterface::class)
+            ->setFactory([EventLoopFactory::class, 'create'])
+            ->setShared(true);
+
+        // Set up socket client
+        $container
+            ->rule(ClientInterface::class)
+            ->setFactory(function (ContainerInterface $container) {
+                return $container->call([$container->get(AppInterface::class), 'getChatClient']);
+            })
+            ->addCall('initialize')
+            ->setShared(true);
     }
 
     /**
@@ -231,7 +261,7 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
 
         $this->addons->startAddons($this->config->get('addons.active'));
 
-        $this->fire('queueStart');
+        $this->fire('start');
     }
 
     /**
@@ -256,8 +286,40 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
      */
     public function run($workerConfig) {
 
-        // Execute payload
+        $this->log(LogLevel::NOTICE, "ChatBot starting");
 
+        // Execute payload
+        //$client = $this->container->get(ClientInterface::class);
+        //$client = $this->container->get(Client\Slack\SlackRtmClient::class);
+        $client = $this->container->call([$this, 'getChatClient']);
+        $client->run();
+
+    }
+
+    /**
+     * Get chat client instance
+     *
+     * @param ConfigInterface $config
+     * @param ContainerInterface $container
+     * @param LoggerInterface $logger
+     * @return ClientInterface
+     */
+    public function getChatClient(ConfigInterface $config, ContainerInterface $container, LoggerInterface $logger) {
+        $logger->log(LogLevel::NOTICE, "Loading chat client");
+
+        $clientType = $config->get('client.type');
+        $logger->log(LogLevel::INFO, " type: {type}", [
+            'type' => ucfirst($clientType)
+        ]);
+
+        $clientHandler = $config->get("client.{$clientType}.handler");
+        $logger->log(LogLevel::INFO, " handler: {handler}", [
+            'handler' => $clientHandler
+        ]);
+
+        $connect = $config->get("connect.{$clientType}");
+        $client = $container->getArgs($clientHandler, [$connect]);
+        return $client;
     }
 
 }

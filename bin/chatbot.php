@@ -11,9 +11,9 @@
 
 namespace Kaecyra\ChatBot;
 
-use \Garden\Daemon\Daemon;
-use \Garden\Container\Container;
-use \Psr\Log\LogLevel;
+use Garden\Daemon\Daemon;
+use Garden\Container\Container;
+use Psr\Log\LogLevel;
 
 // Switch to root directory
 chdir(dirname($argv[0]));
@@ -44,7 +44,7 @@ ChatBot::bootstrap($container, [
 $exitCode = 0;
 try {
 
-    $daemon = $di->get(Daemon::class);
+    $daemon = $container->get(Daemon::class);
     $exitCode = $daemon->attach($argv);
 
 } catch (\Garden\Daemon\Exception $ex) {
@@ -58,10 +58,13 @@ try {
             $logger->log(LogLevel::ERROR, "Error on line {$line} of {$file}:");
         }
         $logger->log(LogLevel::ERROR, $ex->getMessage());
+
+        foreach ($ex->getTrace() as $traceLine) {
+            $logger->log(LogLevel::DEBUG, $traceLine);
+        }
     }
 
-}
-catch (\Exception $ex) {
+} catch (\Exception $ex) {
     $exitCode = 1;
 
     if ($ex->getFile()) {
@@ -70,6 +73,10 @@ catch (\Exception $ex) {
         $logger->log(LogLevel::ERROR, "Error on line {$line} of {$file}:");
     }
     $logger->log(LogLevel::ERROR, $ex->getMessage());
+
+    foreach (explode("\n", $ex->getTraceAsString()) as $traceLine) {
+        $logger->log(LogLevel::DEBUG, $traceLine);
+    }
 }
 
 exit($exitCode);

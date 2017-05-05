@@ -8,7 +8,7 @@
     },
     "addons": {
         "active": {
-            "Slack": "on"
+            
         },
         "scan": [
             "addons/",
@@ -16,7 +16,7 @@
         ]
     },
     "log": {
-        "level": "info",
+        "level": "debug",
         "loggers": [
             {
                 "destination": "echo",
@@ -28,5 +28,11 @@
                 "key": "persist"
             }
         ]
+    },
+    "client": {
+        "type": "slack",
+        "slack": {
+            "handler": "\\Kaecyra\\ChatBot\\Client\\Slack\\SlackRtmClient"
+        }
     }
 }
