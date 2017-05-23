@@ -10,6 +10,9 @@ namespace Kaecyra\ChatBot;
 use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
 use Kaecyra\ChatBot\Client\ClientInterface;
+use Kaecyra\ChatBot\Client\AbstractClient;
+
+use Kaecyra\ChatBot\Bot\Persona;
 
 use Garden\Daemon\Daemon;
 use Garden\Daemon\AppInterface;
@@ -182,22 +185,49 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         // Set up app interface
         $container
             ->rule(AppInterface::class)
-            ->setClass(self::class)
-            ->setShared(true);
+            ->setClass(self::class);
 
         // Set up loop
         $container
             ->rule(LoopInterface::class)
-            ->setFactory([EventLoopFactory::class, 'create'])
-            ->setShared(true);
+            ->setFactory([EventLoopFactory::class, 'create']);
 
-        // Set up socket client
+        $config = $container->get(ConfigInterface::class);
+        $clientType = $config->get('client.type');
+        $clientHandler = $config->get("client.{$clientType}.handler");
+        if (!$container->has($clientHandler)) {
+            throw new Exception("Unknown client handler: {$clientHandler}");
+        }
+
+//        $clientSettings = $config->get("connect.{$clientType}");
+//
+//        $container
+//            ->rule(ClientInterface::class)
+//            ->addAlias(AbstractClient::class)
+//            ->addAlias($clientHandler)
+//            ->setClass($clientHandler)
+//            ->setConstructorArgs([
+//                'settings' => $clientSettings
+//            ]);
+
         $container
             ->rule(ClientInterface::class)
-            ->setFactory(function (ContainerInterface $container) {
-                return $container->call([$container->get(AppInterface::class), 'getChatClient']);
+            ->setFactory(function (
+                ContainerInterface $container,
+                ConfigInterface $config
+            ) {
+                $clientType = $config->get('client.type');
+                $clientHandler = $config->get("client.{$clientType}.handler");
+                if (!$container->has($clientHandler)) {
+                    throw new Exception("Unknown client handler: {$clientHandler}");
+                }
+                $clientSettings = $config->get("connect.{$clientType}");
+                $client = $container->getArgs($clientHandler, [
+                    $clientSettings
+                ]);
+                $container->setInstance(ClientInterface::class, $client);
+                return $client;
             })
-            ->addCall('initialize')
             ->setShared(true);
     }
 
@@ -254,11 +284,13 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         $this->log(LogLevel::INFO, " initializing");
 
         // Remove echo logger
-
         $this->log(LogLevel::INFO, " transitioning logger");
         $this->getLogger()->removeLogger('echo', false);
         $this->getLogger()->enableLogger('persist');
 
+        $this->log(LogLevel::INFO, "Loggers transitioned to persist");
+
+        // Start addons
         $this->addons->startAddons($this->config->get('addons.active'));
 
         $this->fire('start');
@@ -288,38 +320,12 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
 
         $this->log(LogLevel::NOTICE, "ChatBot starting");
 
-        // Execute payload
-        //$client = $this->container->get(ClientInterface::class);
-        //$client = $this->container->get(Client\Slack\SlackRtmClient::class);
-        $client = $this->container->call([$this, 'getChatClient']);
-        $client->run();
+        $this->container->get(ClientInterface::class);
 
-    }
+        // Get persona
+        $persona = $this->container->get(Persona::class);
+        $persona->run();
 
-    /**
-     * Get chat client instance
-     *
-     * @param ConfigInterface $config
-     * @param ContainerInterface $container
-     * @param LoggerInterface $logger
-     * @return ClientInterface
-     */
-    public function getChatClient(ConfigInterface $config, ContainerInterface $container, LoggerInterface $logger) {
-        $logger->log(LogLevel::NOTICE, "Loading chat client");
-
-        $clientType = $config->get('client.type');
-        $logger->log(LogLevel::INFO, " type: {type}", [
-            'type' => ucfirst($clientType)
-        ]);
-
-        $clientHandler = $config->get("client.{$clientType}.handler");
-        $logger->log(LogLevel::INFO, " handler: {handler}", [
-            'handler' => $clientHandler
-        ]);
-
-        $connect = $config->get("connect.{$clientType}");
-        $client = $container->getArgs($clientHandler, [$connect]);
-        return $client;
     }
 
 }

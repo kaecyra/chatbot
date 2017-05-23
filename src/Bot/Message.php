@@ -1,0 +1,37 @@
+<?php
+
+/**
+ * @license MIT
+ * @copyright 2016-2017 Tim Gunter
+ */
+
+namespace Kaecyra\ChatBot\Bot;
+
+use Kaecyra\ChatBot\Socket\MessageInterface;
+
+/**
+ * Core bot persona
+ *
+ * @author Tim Gunter <tim@vanillaforums.com>
+ * @package chatbot
+ */
+class Message {
+
+    /**
+     *
+     * @var MessageInterface
+     */
+    protected $socketMessage;
+
+    /**
+     * Set up message
+     *
+     * @param MessageInterface $message
+     */
+    public function __construct(
+        MessageInterface $message
+    ) {
+        $this->socketMessage = $message;
+    }
+
+}

@@ -19,11 +19,11 @@ interface MessageInterface {
 
 
     /**
-     * Parse wire format of message
+     * Ingest string message in wire format
      *
      * @param string $message
      */
-    public function parse(string $message): MessageInterface;
+    public function ingest(string $message): MessageInterface;
 
     /**
      * Return wire format of message

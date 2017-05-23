@@ -7,6 +7,8 @@
 
 namespace Kaecyra\ChatBot\Socket;
 
+use Kaecyra\AppCommon\Store;
+
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
 /**
@@ -17,7 +19,7 @@ use Kaecyra\ChatBot\Socket\MessageInterface;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-abstract class AbstractSocketMessage implements MessageInterface {
+abstract class AbstractSocketMessage extends Store implements MessageInterface {
 
     /**
      *
@@ -26,17 +28,11 @@ abstract class AbstractSocketMessage implements MessageInterface {
     protected $method;
 
     /**
-     *
-     * @var array
-     */
-    protected $data;
-
-    /**
-     * Parse wire format of message
+     * Ingest string message in wire format
      *
      * @param string $message
      */
-    abstract public function parse(string $message): MessageInterface;
+    abstract public function ingest(string $message): MessageInterface;
 
     /**
      * Return wire format of message

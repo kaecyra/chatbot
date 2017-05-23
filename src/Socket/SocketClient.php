@@ -7,23 +7,16 @@
 
 namespace Kaecyra\ChatBot\Socket;
 
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
+use Kaecyra\ChatBot\Client\ClientInterface;
+use Kaecyra\ChatBot\Client\AbstractClient;
+use Kaecyra\ChatBot\Socket\MessageInterface;
 
-use Kaecyra\AppCommon\Event\EventAwareInterface;
-use Kaecyra\AppCommon\Event\EventAwareTrait;
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
-use Psr\Log\LoggerAwareInterface;
-use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LogLevel;
 
 use React\EventLoop\LoopInterface;
 
 use Ratchet\Client\WebSocket;
-use Ratchet\RFC6455\Messaging\MessageInterface;
-
-use Kaecyra\ChatBot\Socket\MessageInterface as SocketMessageInterface;
+use Ratchet\RFC6455\Messaging\MessageInterface as SocketMessageInterface;
 
 use \Exception;
 
@@ -33,31 +26,15 @@ use \Exception;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface, EventAwareInterface {
-
-    use LoggerAwareTrait;
-    use LoggerBoilerTrait;
-    use TaggedLogTrait;
-    use EventAwareTrait;
+abstract class SocketClient extends AbstractClient {
 
     const RETRY_INIT = -2;
     const RETRY_RECONNECT = -1;
     const RETRY_CONNECT = 0;
-
     const RETRY_DELAY = 15;
 
-    const STATE_FRESH = 'fresh';
-    const STATE_CONFIGURED = 'configured';
-    const STATE_OFFLINE = 'offline';
-    const STATE_CONNECTING = 'connecting';
-    const STATE_CONNECTED = 'connected';
-    const STATE_READY = 'ready';
-
-    /**
-     * Client settings
-     * @var array
-     */
-    protected $settings;
+    const MESSAGE_INBOUND = 'inbound';
+    const MESSAGE_OUTBOUND = 'outbound';
 
     /**
      * Server info
@@ -78,16 +55,10 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     protected $connection;
 
     /**
-     * Connection state
-     * @var string
-     */
-    protected $state = self::STATE_FRESH;
-
-    /**
      * Tick frequency
-     * @var integer
+     * @var float
      */
-    protected $tickFreq = 1;
+    protected $tickFreq = 1.0;
 
     /**
      * Class for message handler
@@ -96,14 +67,21 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     protected $messageFactory;
 
     /**
+     * Connection DSN
+     * @var string
+     */
+    protected $dsn = '';
+
+    /**
      *
      * @param LoopInterface $loop
      * @param array $settings
      */
     public function __construct(LoopInterface $loop, array $settings) {
+        parent::__construct($settings);
+
         $this->loop = $loop;
         $this->retry = self::RETRY_INIT;
-        $this->settings = $settings;
     }
 
     /**
@@ -111,12 +89,12 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
      *
      */
     public function run() {
-        if (!$this->isState(self::STATE_CONFIGURED)) {
-            $this->tLog(LogLevel::ERROR, "not configured");
+        $this->tLog(LogLevel::NOTICE, "Running socket client");
+        if (!$this->isState(ClientInterface::STATE_CONFIGURED)) {
+            $this->tLog(LogLevel::ERROR, " not configured");
             return;
         }
 
-        $this->tLog(LogLevel::NOTICE, "running socket client");
         $this->loop->addPeriodicTimer($this->tickFreq, [$this, 'tick']);
         $this->loop->run();
     }
@@ -126,16 +104,20 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
      *
      */
     public function tick() {
+        $this->tLog(LogLevel::DEBUG, "tick");
+
         // Stay connected
         if (!($this->connection instanceof WebSocket)) {
+            $this->tLog(LogLevel::DEBUG, "[currently] not connected");
+
             if ($this->retry == self::RETRY_INIT) {
                 $this->retry = self::RETRY_CONNECT;
-                $this->tLog(LogLevel::NOTICE, "connecting");
+                $this->tLog(LogLevel::DEBUG, " initial connect");
             }
 
             if ($this->retry <= self::RETRY_RECONNECT) {
                 $this->retry = self::RETRY_DELAY;
-                $this->tLog(LogLevel::WARNING, "retrying in {$this->retry} sec");
+                $this->tLog(LogLevel::WARNING, " retrying in {$this->retry} sec");
             }
 
             if (!$this->retry) {
@@ -145,9 +127,11 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
             }
 
             return false;
+        } else {
+            $this->tLog(LogLevel::DEBUG, "[currently] connected");
         }
 
-        return true;
+        //
     }
 
     /**
@@ -171,36 +155,6 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     }
 
     /**
-     * Set connection state
-     *
-     * @param string $state
-     * @return SocketClient
-     */
-    public function setState(string $state) {
-        $this->state = $state;
-        return $this;
-    }
-
-    /**
-     * Get connection state
-     *
-     * @return string
-     */
-    public function getState(): string {
-        return $this->state;
-    }
-
-    /**
-     * Check the current state
-     *
-     * @param string $state
-     * @return bool
-     */
-    public function isState(string $state): bool {
-        return $this->state == $state;
-    }
-
-    /**
      * Set SocketMessage factory callable
      *
      * @param callable $factory
@@ -214,12 +168,13 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     /**
      * Get fresh socket message
      *
+     * @param string $direction 'inbound' or 'outbound'
      * @return SocketMessageInterface
      * @throws Exception
      */
-    public function getMessage(): SocketMessageInterface {
+    public function getMessage(string $direction): MessageInterface {
         if (is_callable($this->messageFactory)) {
-            return call_user_func($this->messageFactory);
+            return call_user_func($this->messageFactory, $direction);
         }
         throw new Exception('Failed to create socket message, factory not configured');
     }
@@ -235,11 +190,11 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
         }
 
         $this->retry = self::RETRY_RECONNECT;
-        $this->tLog(LogLevel::NOTICE, "connecting: {dsn}", [
+        $this->tLog(LogLevel::NOTICE, " connecting socket client: {dsn}", [
             'dsn' => $this->getDSN()
         ]);
 
-        $this->setState(self::STATE_CONNECTING);
+        $this->setState(ClientInterface::STATE_CONNECTING);
 
         $connector = new \Ratchet\Client\Connector($this->loop);
         $connector($this->getDSN(), [], [
@@ -256,11 +211,11 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
         $this->tLog(LogLevel::NOTICE, "connected");
 
         $this->connection = $connection;
-        $this->connection->on('message', [$this, 'onMessage']);
-        $this->connection->on('close', [$this, 'onClose']);
-        $this->connection->on('error', [$this, 'onError']);
+        $this->connection->on('message', [$this, 'onSocketMessage']);
+        $this->connection->on('close', [$this, 'onSocketClose']);
+        $this->connection->on('error', [$this, 'onSocketError']);
 
-        $this->setState(self::STATE_CONNECTED);
+        $this->setState(ClientInterface::STATE_CONNECTED);
 
         $this->fire('socket_connected');
     }
@@ -273,6 +228,17 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     public function connectFailed(Exception $ex) {
         $this->tLog(LogLevel::ERROR, "could not connect: {$ex->getMessage()}");
         $this->offline();
+
+        $this->fire('socket_failed');
+    }
+
+    /**
+     *
+     */
+    public function reconnect() {
+        $this->tLog(LogLevel::NOTICE, "Reconnecting");
+        $this->connection->close();
+        $this->connect();
     }
 
     /**
@@ -281,28 +247,19 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
      */
     public function offline() {
         $this->connection = null;
-        $this->setState(self::STATE_OFFLINE);
-    }
-
-    /**
-     * Test if client is ready
-     *
-     * @return boolean
-     */
-    public function isReady() {
-        return $this->isState(self::STATE_READY);
+        $this->setState(ClientInterface::STATE_OFFLINE);
     }
 
     /**
      * Send a message to the server
      *
      * @param string $method
-     * @param mixed $data
+     * @param array $data
      */
-    public function sendMessage(string $method, $data = null) {
-        $this->tLog(LogLevel::INFO, "send message: {$method}");
+    public function sendMessage(string $method, array $data = []) {
+        $this->tLog(LogLevel::INFO, "send socket message: {$method}");
 
-        $message = $this->getMessage();
+        $message = $this->getMessage(self::MESSAGE_OUTBOUND);
         $message->populate($method, $data);
 
         $this->connection->send($message);
@@ -311,26 +268,23 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     /**
      * Handle receiving socket message
      *
-     * @param MessageInterface $msg
+     * @param SocketMessageInterface $socketMessage
      */
-    public function onMessage(MessageInterface $msg) {
-        $this->tLog(LogLevel::INFO, "message received");
+    public function onSocketMessage(SocketMessageInterface $socketMessage) {
+        $this->tLog(LogLevel::INFO, "socket message received");
 
         try {
-            $message = $this->getMessage();
-            $message->parse($msg);
+            $message = $this->getMessage(self::MESSAGE_INBOUND);
+            $message->ingest($socketMessage);
 
-            $this->tLog(LogLevel::INFO, "message method: ".$message->getMethod());
+            $this->tLog(LogLevel::INFO, "socket message method: ".$message->getMethod());
 
             // Route to message handler
-            $call = 'message_'.$message->getMethod();
-            if (is_callable([$this, $call])) {
-                $this->$call($message);
-            } else {
-                $this->tLog(LogLevel::WARNING, sprintf(" could not handle message: unknown type '{%s}'", $message->getMethod()));
-            }
+            $this->fire('socket_message', [$message]);
+            $this->onMessage($message);
+
         } catch (\Exception $ex) {
-            $this->tLog(LogLevel::ERROR, "msg handling error: ".$ex->getMessage());
+            $this->tLog(LogLevel::ERROR, "socket message handling error: ".$ex->getMessage());
             return false;
         }
     }
@@ -338,21 +292,35 @@ abstract class SocketClient implements LoggerAwareInterface, TaggedLogInterface,
     /**
      * Handle connection closing
      *
-     * @param integer $code
+     * @param int $code
      * @param string $reason
      */
-    public function onClose($code = null, $reason = null) {
-        $this->tLog(LogLevel::NOTICE, "connection closed ({$code} - {$reason})");
+    public function onSocketClose($code = null, $reason = null) {
+        $this->tLog(LogLevel::NOTICE, "socket connection closed ({code} - {reason})", [
+            'code' => $code ?? 'unknown code',
+            'reason' => $reason ?? 'unknown reason'
+        ]);
         $this->offline();
+
+        // Propagate disconnect event
+        $this->fire('socket_closed');
+        $this->onClose($code, $reason);
     }
 
     /**
+     * Handle socket errors
      *
      * @param string $reason
      * @param WebSocket $connection
      */
-    public function onError($reason, WebSocket $connection) {
-        $this->tLog(LogLevel::ERROR, "socket error: {$reason}");
+    public function onSocketError(string $reason, WebSocket $connection) {
+        $this->tLog(LogLevel::ERROR, "socket error: {reason}", [
+            'reason' => $reason ?? 'unknown reason'
+        ]);
+
+        // Propagate error event
+        $this->fire('socket_error');
+        $this->onError($reason, $connection);
     }
 
 }

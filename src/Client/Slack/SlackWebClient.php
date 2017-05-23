@@ -8,6 +8,7 @@
 namespace Kaecyra\ChatBot\Client\Slack;
 
 use Garden\Http\HttpClient;
+use Garden\Http\HttpResponse;
 
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
@@ -38,13 +39,6 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      */
     protected $token;
 
-
-    public function __construct($baseUrl = '') {
-        parent::__construct($baseUrl);
-
-        $this->tLog(LogLevel::DEBUG, "Created slack web client instance");
-    }
-
     /**
      * Initialize web client
      *
@@ -52,7 +46,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      * @param string $token
      */
     public function initialize(string $baseUrl, string $token) {
-        $this->tLog(LogLevel::NOTICE, "Initializing Web API");
+        $this->tLog(LogLevel::NOTICE, "Initializing Web client");
 
         $this->setBaseUrl($baseUrl);
         $this->tLog(LogLevel::INFO, " url: {baseurl}", [
@@ -131,10 +125,88 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      * Connect to RTM session
      *
      * Use the internal token to request a new RTM session.
+     *
+     * @return HttpResponse
      */
-    public function rtm_connect() {
+    public function rtm_connect(): HttpResponse {
         return $this->get('/rtm.connect');
     }
+
+    /**
+     * Get public channels
+     *
+     * @param bool $archived optional. include archived channels. default false.
+     * @param bool $members optional. include member lists. default false.
+     * @return HttpResponse
+     */
+    public function channels_list(bool $archived = false, bool $members = false): HttpResponse {
+        return $this->get('/channels.list', [
+            'exclude_archived' => !$archived ? 'true' : 'false',
+            'exclude_members' => !$members ? 'true' : 'false'
+        ]);
+    }
+
+    /**
+     * Get channel info
+     *
+     * @param string $channel
+     * @return HttpResponse
+     */
+    public function channels_info(string $channel): HttpResponse {
+        return $this->get('/channels.info', [
+            'channel' => $channel
+        ]);
+    }
+
+    /**
+     * Get private channels
+     *
+     * @param bool $archived optional. include archived channels. default false.
+     * @return HttpResponse
+     */
+    public function groups_list(bool $archived = false): HttpResponse {
+        return $this->get('/groups.list', [
+            'exclude_archived' => !$archived ? 'true' : 'false'
+        ]);
+    }
+
+    /**
+     * Get group info
+     *
+     * @param string $channel
+     * @return HttpResponse
+     */
+    public function groups_info(string $channel): HttpResponse {
+        return $this->get('/groups.info', [
+            'channel' => $channel
+        ]);
+    }
+
+    /**
+     * Get user list
+     *
+     * @param bool $presence optional. include presence information. default true.
+     * @return HttpResponse
+     */
+    public function users_list(bool $presence = true): HttpResponse {
+        return $this->get('/users.list', [
+            'presence' => $presence ? 'true' : 'false'
+        ]);
+    }
+
+    /**
+     * Get a user's info
+     *
+     * @param string $user
+     * @return HttpResponse
+     */
+    public function users_info(string $user): HttpResponse {
+        return $this->get('/users.info', [
+            'user' => $user
+        ]);
+    }
+
+
 
 
 

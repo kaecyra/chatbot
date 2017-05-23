@@ -9,6 +9,7 @@
             "email": "tim@vanillaforums.com"
         }
     ],
+    "minimum-stability": "beta",
     "require": {
         "php": ">=7.0",
         "kaecyra/app-common": "~0.10",

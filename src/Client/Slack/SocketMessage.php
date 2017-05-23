@@ -8,7 +8,7 @@
 namespace Kaecyra\ChatBot\Client\Slack;
 
 use Kaecyra\ChatBot\Socket\AbstractSocketMessage;
-use Psr\Log\LogLevel;
+use Kaecyra\ChatBot\Socket\MessageInterface;
 
 use \Exception;
 
@@ -27,15 +27,17 @@ class SocketMessage extends AbstractSocketMessage {
      * @return MessageInterface
      * @throws Exception
      */
-    public function parse(string $message): MessageInterface {
-        $messageData = json_decode($message, true);
-        if ($messageData === false) {
+    public function ingest(string $message): MessageInterface {
+        $messageData = json_decode(trim($message), true);
+        if (!is_array($messageData)) {
             throw new \Exception('Unable to decode incoming message');
         }
 
-        $message = self::create();
-        $message->populate($messageData);
-        return $message;
+        $method = $messageData['type'];
+        unset($messageData['type']);
+
+        $this->populate($method, $messageData);
+        return $this;
     }
 
     /**
@@ -44,10 +46,9 @@ class SocketMessage extends AbstractSocketMessage {
      * @return string
      */
     public function compile(): string {
-        return json_encode([
-            'method' => $this->method,
-            'data' => $this->data
-        ]);
+        return json_encode(array_merge([
+            'type' => $this->method
+        ], $this->data));
     }
 
 }
