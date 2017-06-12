@@ -263,5 +263,24 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
         return $this->post('/chat.postMessage', $payload);
     }
 
+    /**
+     * Post a me message
+     * 
+     * @param string $channel
+     * @param string $text
+     * @return HttpResponse
+     */
+    public function chat_me_message(string $channel, string $text): HttpResponse {
+        $defaults = [
+
+        ];
+        $payload = [
+            'channel' => $channel,
+            'text' => $text
+        ];
+
+        $payload = array_merge($defaults, $payload);
+        return $this->post('/chat.meMessage', $payload);
+    }
 
 }

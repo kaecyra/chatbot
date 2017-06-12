@@ -601,7 +601,13 @@ class SlackRtmClient extends SocketClient {
                     'destid' => $command->destination->getID(),
                     'message' => $command->message
                 ]);
-                $this->web->chat_post_message($command->destination->getID(), $command->message, $command->attachments, $command->options);
+
+                if ($command->type == 'message') {
+                    $this->web->chat_post_message($command->destination->getID(), $command->message, $command->attachments, $command->options);
+                } else if ($command->type == 'action') {
+                    $this->web->chat_me_message($command->destination->getID(), $command->message);
+                }
+
                 return;
                 break;
         }
@@ -629,6 +635,44 @@ class SlackRtmClient extends SocketClient {
         $sendCommand->options = $options;
         $sendCommand->attachments = $attachments;
         $sendCommand->destination = $destination;
+        $sendCommand->type = 'message';
+
+        // Determine required strategy
+        $destinationType = $destination->getMapType();
+        switch ($destinationType) {
+            case 'User':
+                $sendCommand->strategy = new SendUserStrategy;
+                break;
+            case 'Room':
+                $sendCommand->strategy = new SendRoomStrategy;
+                break;
+            case 'Conversation':
+                $sendCommand->strategy = new SendConversationStrategy;
+                break;
+            default:
+                throw new Exception("Unsupported DestinationInterface '{$destinationType}'");
+                break;
+        }
+
+        // Queue command
+        $this->queueCommand($sendCommand);
+    }
+
+    /**
+     * Send action message
+     *
+     * @param DestinationInterface $destination
+     * @param string $message
+     * @throws Exception
+     */
+    public function sendAction(DestinationInterface $destination, string $message) {
+        // Prepare action command
+        $sendCommand = new SimpleCommand('send_message');
+        $sendCommand->setExpiry(20);
+        $sendCommand->format = 'simple';
+        $sendCommand->message = $message;
+        $sendCommand->destination = $destination;
+        $sendCommand->type = 'action';
 
         // Determine required strategy
         $destinationType = $destination->getMapType();
