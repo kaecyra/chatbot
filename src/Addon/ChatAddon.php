@@ -10,6 +10,7 @@ namespace Kaecyra\ChatBot\Addon;
 use Kaecyra\ChatBot\Client\ClientInterface;
 
 use Kaecyra\AppCommon\Addon\AbstractAddon;
+use Kaecyra\AppCommon\Store;
 
 /**
  * Abstract Command
@@ -25,10 +26,17 @@ abstract class ChatAddon extends AbstractAddon {
      */
     protected $client;
 
+    /**
+     * Data store
+     * @var Store
+     */
+    protected $store;
+
     public function __construct(ClientInterface $client, $config = array()) {
         parent::__construct($config);
 
         $this->client = $client;
+        $this->store = new Store;
     }
 
 }

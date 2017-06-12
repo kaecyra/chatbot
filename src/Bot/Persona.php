@@ -248,8 +248,8 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
     public function onDirectMessage(User $userObject, string $message) {
 
         // Don't do anything for blank chats
-        $body = rtrim(trim($message), '.?,');
-        if (!strlen($body)) {
+        $checkBody = rtrim(trim($message), '.?,');
+        if (!strlen($checkBody)) {
             return;
         }
 
@@ -272,6 +272,13 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
      * @param string $message
      */
     public function onGroupMessage(Room $roomObject, User $userObject, string $message) {
+
+        // Don't do anything for blank chats
+        $checkBody = rtrim(trim($message), '.?,');
+        if (!strlen($checkBody)) {
+            return;
+        }
+
         $this->fire('groupMessage', [
             $roomObject,
             $userObject,
