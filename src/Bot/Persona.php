@@ -8,8 +8,11 @@
 namespace Kaecyra\ChatBot\Bot;
 
 use Kaecyra\ChatBot\Client\ClientInterface;
-use Kaecyra\ChatBot\Bot\Command\CommandInterface;
 use Kaecyra\ChatBot\Client\AsyncEvent;
+
+use Kaecyra\ChatBot\Bot\Command\CommandInterface;
+use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
+use Kaecyra\ChatBot\Bot\Command\FluidCommand;
 
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
@@ -60,6 +63,12 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
     protected $loop;
 
     /**
+     * Roster
+     * @var Roster
+     */
+    protected $roster;
+
+    /**
      * Tick frequency
      * @var float
      */
@@ -75,15 +84,19 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
      *
      * @param ContainerInterface $container
      * @param ClientInterface $client
+     * @param Roster $roster
+     * @param LoopInterface $loop
      */
     public function __construct(
         ContainerInterface $container,
         ClientInterface $client,
+        Roster $roster,
         LoopInterface $loop
     ) {
         $this->container = $container;
         $this->client = $client;
         $this->loop = $loop;
+        $this->roster = $roster;
 
         $this->store = new Store;
     }
@@ -119,7 +132,7 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             return;
         }
 
-        $this->tLog(LogLevel::NOTICE, "Running async queue");
+        $this->tLog(LogLevel::INFO, "Running async queue");
 
         // Iterate over queue and fire off commands
         foreach ($queue as $asyncEvent) {
@@ -172,6 +185,14 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
      */
     public function runCommand(CommandInterface $command) {
         $commandName = $command->getCommand();
+        if ($command->isExpired()) {
+            $this->tLog(LogLevel::WARNING, "Expired command: {method} ({expiry} sec)", [
+                'method' => $commandName,
+                'expiry' => $command->getExpiry()
+            ]);
+            return;
+        }
+
         if (method_exists($this->client, "command_{$commandName}")) {
             $this->container->call([$this->client, "command_{$commandName}"], [
                 'command' => $command
@@ -186,57 +207,178 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
         }
     }
 
+    /**
+     * Get the roster
+     *
+     * @return Roster
+     */
+    public function getRoster(): Roster {
+        return $this->roster;
+    }
+
 
     public function onJoin(Room $room, User $user) {
-
+        $this->fire('join', [
+            $room,
+            $user
+        ]);
     }
 
 
     public function onLeave(Room $room, User $user) {
-
+        $this->fire('leave', [
+            $room,
+            $user
+        ]);
     }
 
 
-    public function presenceChange(User $user) {
-
+    public function onPresenceChange(User $user) {
+        $this->fire('presence', [
+            $user
+        ]);
     }
 
     /**
+     * Handle a direct message
      *
-     * @param User $user
-     * @param Message $message
+     * @param User $userObject
+     * @param string $message
      */
-    public function onDirectMessage(User $user, Message $message) {
+    public function onDirectMessage(User $userObject, string $message) {
 
+        // Don't do anything for blank chats
+        $body = rtrim(trim($message), '.?,');
+        if (!strlen($body)) {
+            return;
+        }
+
+        $conversationObject = $this->roster->getConversation('userid', $userObject->getID());
+
+        $this->fire('privateMessage', [
+            $conversationObject,
+            $userObject,
+            $message
+        ]);
+
+        $this->onDirectedMessage($conversationObject, $userObject, $message);
     }
 
     /**
+     * Handle a group message
      *
-     * @param Room $room
-     * @param User $user
-     * @param Message $message
+     * @param Room $roomObject
+     * @param User $userObject
+     * @param string $message
      */
-    public function onGroupMessage(Room $room, User $user, Message $message) {
+    public function onGroupMessage(Room $roomObject, User $userObject, string $message) {
+        $this->fire('groupMessage', [
+            $roomObject,
+            $userObject,
+            $message
+        ]);
 
+        $botUserObject = $this->container->get(BotUser::class);
+        $botNames = [
+            strtolower($botUserObject->getName()),
+            strtolower($botUserObject->getReal())
+        ];
+
+        foreach ($botNames as $botName) {
+
+            $body = $message;
+
+            // If our name is in the message, look for it at either end
+            if (stristr($body, $botName)) {
+                $command = null;
+
+                $matchedNick = false;
+
+                // Left side exclude
+                $matches = 0;
+                $body = preg_replace("/^(@?(?:{$botName}),? ?)/i", '', $body, -1, $matches);
+                $matchedNick = $matchedNick || $matches > 0;
+                $body = preg_replace("/(,? ?@?(?:{$botName})\??)$/i", '', $body, -1, $matches);
+                $matchedNick = $matchedNick || $matches > 0;
+
+                $command = $body;
+
+                // If this was directed at us, parse for commands
+                if (!is_null($command) && $matchedNick) {
+                    $this->onDirectedMessage($roomObject, $userObject, $command);
+                    break;
+                }
+            }
+
+        }
     }
 
     /**
+     * Handle a bot-directed message
+     *
+     * @param DestinationInterface $destinationObject
+     * @param User $userObject
+     * @param string $message
+     * @return type
+     */
+    public function onDirectedMessage(DestinationInterface $destinationObject, User $userObject, string $message) {
+
+        $this->tLog(LogLevel::INFO, "Directed: [{destination}][{name}] {text}", [
+            'destination' => $destinationObject->getID(),
+            'name' => $userObject->getReal(),
+            'text' => $message
+        ]);
+
+        // Parse command string into state
+        $command = $this->container->getArgs(FluidCommand::class, [$message]);
+        $command->addTarget('destination', $destinationObject);
+        $command->addTarget('user', $userObject);
+        $command->analyze();
+
+        $this->fire('directedMessage', [
+            $destinationObject,
+            $userObject,
+            $command
+        ]);
+
+        // If no method was provided, bail out
+        if (!$command->getCommand()) {
+            return;
+        }
+        $this->tLog(LogLevel::NOTICE, "Command: {command}", [
+            'command' => $command->getCommand()
+        ]);
+
+        // Execute command
+        $this->runCommand($command);
+    }
+
+    /**
+     * Connection close
      *
      * @param int $code
      * @param string $reason
      */
     public function onClose($code, $reason) {
-
+        $this->fire('connectionClose');
     }
 
     /**
      *
-     * @param User $user
-     * @param Message $message
+     * @param DestinationInterface $to
+     * @param string $message
      */
-    public function sendMessage(User $user, Message $message) {
-
+    public function sendMessage(DestinationInterface $to, string $message) {
+        $this->client->sendChat($to, $message);
     }
 
+    /**
+     *
+     * @param DestinationInterface $to
+     * @param array $message
+     */
+    public function sendFormattedMessage(DestinationInterface $to, array $message) {
+        $this->client->sendFormattedChat($to, $message);
+    }
 
 }

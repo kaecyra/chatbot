@@ -12,10 +12,20 @@ use Kaecyra\ChatBot\Socket\SocketClient;
 
 use Kaecyra\ChatBot\Socket\MessageInterface;
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
+use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
 
+use Kaecyra\ChatBot\Bot\DestinationInterface;
 use Kaecyra\ChatBot\Bot\User;
+use Kaecyra\ChatBot\Bot\BotUser;
 use Kaecyra\ChatBot\Bot\Room;
 use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Bot\Conversation;
+
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
+
+use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendUserStrategy;
+use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendRoomStrategy;
+use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendConversationStrategy;
 
 use Psr\Container\ContainerInterface;
 use Psr\Log\LogLevel;
@@ -97,7 +107,7 @@ class SlackRtmClient extends SocketClient {
             'Connection',
             'Users',
             'Channels',
-            'IM'
+            'Messages'
         ] as $protocolHandler) {
             $handlerClass = "{$protocolNS}\\{$protocolHandler}";
             if (!$this->container->has($handlerClass)) {
@@ -147,6 +157,13 @@ class SlackRtmClient extends SocketClient {
             $this->setDSN($connectionDSN);
         }
 
+        // Check internet
+        if (!$this->haveConnectivity()) {
+            $this->retry = self::RETRY_RECONNECT;
+            $this->tLog(LogLevel::WARNING, "No internet connection");
+            return;
+        }
+
         // Support DSN override
         $connectionDSN = $this->getDSN();
         if (!$connectionDSN) {
@@ -157,7 +174,18 @@ class SlackRtmClient extends SocketClient {
                 $session = $this->web->rtm_connect();
                 $session = $session->getBody();
 
+                if (($session['ok'] ?? false) !== true) {
+                    throw new Exception("did not receive valid rtm session");
+                }
+
                 $connectionDSN = $session['url'];
+
+                $this->store->set('self', $session['self']);
+                $this->store->set('team', $session['team']);
+
+                // Prepare lightweight bot user
+                $userObject = new BotUser($session['self']['id'], $session['self']['name']);
+                $this->container->setInstance(BotUser::class, $userObject);
 
                 $this->tLog(LogLevel::INFO, " received rtm session");
             } catch (Exception $ex) {
@@ -165,10 +193,13 @@ class SlackRtmClient extends SocketClient {
                     'error' => $ex->getMessage()
                 ]);
             }
-
         }
 
         $this->retry = self::RETRY_RECONNECT;
+
+        if (!$connectionDSN) {
+            return;
+        }
         $this->tLog(LogLevel::NOTICE, " connecting socket client: {dsn}", [
             'dsn' => $connectionDSN
         ]);
@@ -210,6 +241,7 @@ class SlackRtmClient extends SocketClient {
 
         // Regular PING
         $this->callActionHandlers('ping');
+        $this->callActionHandlers('verify_pings');
     }
 
     /**
@@ -228,7 +260,7 @@ class SlackRtmClient extends SocketClient {
      * @param string $reason
      */
     public function onClose($code = null, $reason = null) {
-        $this->persona->onClose($code, $reason);
+
     }
 
     /**
@@ -292,6 +324,12 @@ class SlackRtmClient extends SocketClient {
         $this->callHandlers('message', $method, [
             'message' => $message
         ]);
+        if ($message->has('subtype')) {
+            $subMethod = "{$method}:".$message->get('subtype');
+            $this->callHandlers('message', $subMethod, [
+                'message' => $message
+            ]);
+        }
     }
 
     /**
@@ -332,42 +370,29 @@ class SlackRtmClient extends SocketClient {
      * @return type
      */
     public function command_roster_sync(Roster $roster, CommandInterface $command) {
-        $this->tLog(LogLevel::NOTICE, "Roster sync");
+        $this->tLog(LogLevel::INFO, "Roster sync");
 
         $strategy = $command->strategy;
         $phase = $strategy->getPhase();
-        $this->tLog(LogLevel::NOTICE, " sync phase: {phase}", [
+        $this->tLog(LogLevel::DEBUG, " sync phase: {phase}", [
             'phase' => $phase
         ]);
 
         switch ($phase) {
             case 'purge':
                 $roster->purge();
-                break;
 
-            case 'channels':
-
-                // Get public and private channels
-
-                $scopes = [
-                    'public' => $this->web->channels_list()->getBody()['channels'] ?? [],
-                    'private' => $this->web->groups_list()->getBody()['channels'] ?? []
-                ];
-                foreach ($scopes as $scope => $channels) {
-                    $this->tLog(LogLevel::INFO, " Indexing {scope} channels", [
-                        'scope' => $scope
-                    ]);
-                    foreach ($channels as $channel) {
-                        $this->tLog(LogLevel::INFO, " Channel: {id}:{name}", [
-                            'id' => $channel['id'],
-                            'name' => $channel['name']
-                        ]);
-                        $roomObject = new Room($channel['id'], $channel['name']);
-                        $roomObject->setTopic($channel['purpose']['value'] ?? "");
-                        $roomObject->setData($channel);
-                        $roster->map($roomObject);
-                    }
-                }
+                // Tell the roster how to update expired rooms and users
+                $roster->setTypeRefreshCallback(Room::getMapType(), function(Room $room) {
+                    $command = new SimpleCommand('refresh_room');
+                    $command->room = $room;
+                    $this->queueCommand($command);
+                });
+                $roster->setTypeRefreshCallback(User::getMapType(), function(User $user) {
+                    $command = new SimpleCommand('refresh_user');
+                    $command->user = $user;
+                    $this->queueCommand($command);
+                });
                 break;
 
             case 'users':
@@ -376,25 +401,254 @@ class SlackRtmClient extends SocketClient {
 
                 $users = $this->web->users_list()->getBody()['members'] ?? [];
                 foreach ($users as $user) {
-                    $this->tLog(LogLevel::INFO, " User: {id}:{name}", [
+                    $this->tLog(LogLevel::INFO, " User: {id} ({name})", [
                         'id' => $user['id'],
                         'name' => $user['name']
                     ]);
-                    $userObject = new User($user['id'], $user['name']);
-                    $userObject->setReal($user['real_name'] ?? "");
-                    $userObject->setData($user);
-                    $roster->map($userObject);
+
+                    $this->ingestUser($roster, $user);
                 }
                 break;
 
-            default:
+            case 'channels':
+
+                // Get public and private channels
+
+                $scopes = [
+                    'public' => $this->web->channels_list(false, true)->getBody()['channels'] ?? [],
+                    'private' => $this->web->groups_list(false, true)->getBody()['channels'] ?? []
+                ];
+                foreach ($scopes as $scope => $channels) {
+                    $this->tLog(LogLevel::INFO, " Indexing {scope} channels", [
+                        'scope' => $scope
+                    ]);
+                    foreach ($channels as $channel) {
+                        $this->tLog(LogLevel::INFO, " Channel: {id} ({name})", [
+                            'id' => $channel['id'],
+                            'name' => $channel['name']
+                        ]);
+
+                        $this->ingestRoom($roster, $channel);
+                    }
+                }
+                break;
+
+            case 'join':
+
+                // Join channels
+
+                /*
+                $channels = $roster->getAll(Room::getMapType());
+                foreach ($channels as $channel) {
+                    $this->sendMessage('')
+                }
+                 */
+                break;
+
+            case 'ready':
                 return;
+
+            default:
                 break;
         }
 
         // Queue up next phase
         $command->strategy->nextPhase();
         $this->queueCommand($command);
+    }
+
+    /**
+     * Update room info
+     *
+     * @param Roster $roster
+     * @param CommandInterface $command
+     */
+    public function command_refresh_room(Roster $roster, CommandInterface $command) {
+        $roomID = $command->room->getID();
+        if ($command->room->get('is_channel')) {
+            $room = $this->web->channels_info($roomID)->getBody()['channel'];
+        } else if ($command->room->get('is_group')) {
+            $room = $this->web->groups_info($roomID)->getBody()['group'];
+        }
+        $this->ingestRoom($roster, $room);
+    }
+
+    /**
+     * Ingest and map a room
+     *
+     * @param Roster $roster
+     * @param array $room
+     */
+    protected function ingestRoom(Roster $roster, array $room) {
+        $roomObject = new Room($room['id'], $room['name']);
+        $roomObject->setTopic($room['purpose']['value'] ?? "");
+        $roomObject->setData($room);
+
+        if (isset($room['members']) && is_array($room['members'])) {
+            foreach ($room['members'] as $member) {
+                $mid = $member['id'];
+                try {
+                    $user = $roster->getUser('id', $mid);
+                } catch (MapNotFoundException $ex) {
+                    continue;
+                }
+                $roomObject->addMember($user);
+            }
+        }
+
+        $roster->map($roomObject);
+    }
+
+    /**
+     * Update user info
+     *
+     * @param Roster $roster
+     * @param CommandInterface $command
+     */
+    public function command_refresh_user(Roster $roster, CommandInterface $command) {
+        $userID = $command->user->getID();
+        $user = $this->web->users_info($userID)->getBody()['user'];
+        $this->ingestUser($roster, $user);
+    }
+
+    /**
+     * Ingest and map a user
+     *
+     * @param Roster $roster
+     * @param array $user
+     */
+    protected function ingestUser(Roster $roster, array $user) {
+        if ($user['id'] == $this->store->get('self.id')) {
+            $userObject = new BotUser($user['id'], $user['name']);
+            $this->container->setInstance(BotUser::class, $userObject);
+        } else {
+            $userObject = new User($user['id'], $user['name']);
+        }
+
+        $userObject->setReal($user['real_name'] ?? "");
+        $userObject->setData($user);
+        if (isset($user['presence']) && !empty($user['presence'])) {
+            $userObject->setPresence($user['presence']);
+        }
+        $roster->map($userObject);
+    }
+
+    /**
+     * Request a new Conversation from the API
+     *
+     * @param Roster $roster
+     * @param CommandInterface $command
+     */
+    public function command_get_conversation(Roster $roster, CommandInterface $command) {
+        $userObject = $command->user;
+        $im = $this->web->im_open($userObject->getID())->getBody()['channel'];
+
+        $conversationObject = new Conversation($im['id'], $userObject);
+        $roster->map($conversationObject);
+        $this->tLog(LogLevel::INFO, "IM {imid} created with {name} ({uid})", [
+            'imid' => $conversationObject->getID(),
+            'name' => $userObject->getReal(),
+            'uid' => $userObject->getID()
+        ]);
+    }
+
+
+    public function command_send_message(Roster $roster, CommandInterface $command) {
+        $this->tLog(LogLevel::DEBUG, "Send message");
+
+        $strategy = $command->strategy;
+        $phase = $strategy->getPhase();
+        $this->tLog(LogLevel::DEBUG, " sync phase: {phase}", [
+            'phase' => $phase
+        ]);
+
+        switch ($phase) {
+
+            case 'getconversation':
+
+                $userID = $command->destination->getID();
+                try {
+                    $conversationObject = $roster->getConversation('userid', $userID);
+                    $command->destination = $conversationObject;
+                    $command->strategy->setPhase('sendmessage');
+                } catch (MapNotFoundException $ex) {
+                    $getConversationCommand = new SimpleCommand('get_conversation');
+                    $getConversationCommand->user = $command->destination;
+                    $this->queueCommand($getConversationCommand);
+                    $this->tLog(LogLevel::DEBUG, " requesting new user conversation: {user} ({userid})", [
+                        'user' => $command->destination->getName(),
+                        'userid' => $command->destination->getID()
+                    ]);
+                    $command->strategy->nextPhase();
+                }
+                break;
+
+            case 'waitconversation':
+                $userID = $command->destination->getID();
+                try {
+                    $conversationObject = $roster->getConversation('userid', $userID);
+                } catch (MapNotFoundException $ex) {
+                    // Keep waiting
+                    break;
+                }
+
+                $command->destination = $conversationObject;
+                $command->strategy->nextPhase();
+                break;
+
+            case 'sendmessage':
+                $this->tLog(LogLevel::DEBUG, " sending message: {destid} -> {message}", [
+                    'destid' => $command->destination->getID(),
+                    'message' => $command->message
+                ]);
+                $this->web->chat_post_message($command->destination->getID(), $command->message, $command->attachments, $command->options);
+                return;
+                break;
+        }
+
+        // Queue up next phase
+        $this->queueCommand($command);
+    }
+
+    /**
+     * Send chat message
+     *
+     * @param DestinationInterface $destination
+     * @param string $message
+     * @param array $attachments
+     * @param array $options
+     * @throws Exception
+     */
+    public function sendChat(DestinationInterface $destination, string $message, array $attachments = [], array $options = []) {
+
+        // Prepare message command
+        $sendCommand = new SimpleCommand('send_message');
+        $sendCommand->setExpiry(20);
+        $sendCommand->format = 'simple';
+        $sendCommand->message = $message;
+        $sendCommand->options = $options;
+        $sendCommand->attachments = $attachments;
+        $sendCommand->destination = $destination;
+
+        // Determine required strategy
+        $destinationType = $destination->getMapType();
+        switch ($destinationType) {
+            case 'User':
+                $sendCommand->strategy = new SendUserStrategy;
+                break;
+            case 'Room':
+                $sendCommand->strategy = new SendRoomStrategy;
+                break;
+            case 'Conversation':
+                $sendCommand->strategy = new SendConversationStrategy;
+                break;
+            default:
+                throw new Exception("Unsupported DestinationInterface '{$destinationType}'");
+                break;
+        }
+
+        // Queue command
+        $this->queueCommand($sendCommand);
     }
 
 }

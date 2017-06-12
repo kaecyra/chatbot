@@ -19,4 +19,6 @@ interface CommandInterface {
 
     public function setCommand(string $command): CommandInterface;
 
+    public function isExpired(): bool;
+
 }

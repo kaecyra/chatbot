@@ -17,7 +17,6 @@ namespace Kaecyra\ChatBot\Socket;
  */
 interface MessageInterface {
 
-
     /**
      * Ingest string message in wire format
      *
@@ -70,9 +69,19 @@ interface MessageInterface {
     public function setData(array $data): MessageInterface;
 
     /**
+     * Get key from message data
+     *
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
+     */
+    public function get($key, $default = null);
+
+    /**
      * Convenience string function
      *
      * @return string
      */
     public function __toString();
+
 }

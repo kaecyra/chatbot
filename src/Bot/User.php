@@ -8,14 +8,25 @@
 namespace Kaecyra\ChatBot\Bot;
 
 use Kaecyra\ChatBot\Bot\Map\Mappable;
+use Kaecyra\ChatBot\Bot\Map\MappableInterface;
+use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
+
+use Kaecyra\ChatBot\Bot\Conversation;
+
+use Kaecyra\ChatBot\Bot\DestinationInterface;
 
 /**
- * Core bot persona
+ * User object
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class User extends Mappable {
+class User extends Mappable implements DestinationInterface {
+
+    use DataAccessTrait;
+
+    const ROSTER_STALE = MappableInterface::STALE_RETURN_REFRESH_ASYNC;
+    const ROSTER_EXPIRY = 300;
 
     protected $id;
 
@@ -40,10 +51,26 @@ class User extends Mappable {
 
         $this->data = [];
 
-        $this->setMappedProperties([
+        $this->setMappedProperties('id', [
             'id' => function(){return $this->getID();},
             'name' => function(){return $this->getName();}
         ]);
+    }
+
+    /**
+     * Override stale object handling
+     * @return string
+     */
+    public function getStaleHandling(): string {
+        return self::ROSTER_STALE;
+    }
+
+    /**
+     * Override object expiry
+     * @return int
+     */
+    public function getExpiry(): int {
+        return self::ROSTER_EXPIRY;
     }
 
     /**

@@ -11,12 +11,12 @@ use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
 
 /**
- * Text command parser
+ * Fluid command parser
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class TextCommand extends AbstractCommand implements EventAwareInterface {
+class FluidCommand extends AbstractCommand implements EventAwareInterface {
 
     use EventAwareTrait;
 
@@ -40,9 +40,6 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
         }
 
         $this->setInputString($input, $initial);
-        $this->setCommand(null);
-
-        $this->analyze();
     }
 
     /**
@@ -66,7 +63,7 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
      */
     public function setInputString(string $inputString, array $initial): CommandInterface {
         $this->inputstring = $inputString;
-        $this->setCommand(null);
+        $this->setCommand('');
 
         $defaults = [
             'targets' => [],
@@ -90,7 +87,7 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
      * @param boolean $case optional. case sensitive. default false
      * @return boolean
      */
-    public function match($test, $case = false) {
+    public function match($test, $case = false): bool {
         $flags = '';
         if (!$case) {
             $flags = 'i';
@@ -104,7 +101,7 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
      * @param array|string $tokens
      * @param boolean $all optional. require all tokens. default false (any token)
      */
-    public function have($tokens, $all = false) {
+    public function have($tokens, $all = false): bool {
         if (!is_array($this->data['pieces']) || !count($this->data['pieces'])) {
             return false;
         }
@@ -137,9 +134,9 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
     /**
      * Internal analyze method
      *
-     * @return State
+     * @return CommandInterface
      */
-    protected function analyze() {
+    public function analyze(): CommandInterface {
 
         $this->pieces = explode(' ', $this->getInputString());
         $this->parts = $this['pieces'];
@@ -326,7 +323,7 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
      *
      * @return boolean
      */
-    public function gathering() {
+    public function gathering(): bool {
         return ($this->gather && !empty($this->gather['node']));
     }
 
@@ -503,7 +500,7 @@ class TextCommand extends AbstractCommand implements EventAwareInterface {
      * @param string $name
      * @return boolean
      */
-    public function haveTarget($name) {
+    public function haveTarget($name): bool {
         return (isset($this->targets[$name]) && !empty($this->targets[$name]));
     }
 

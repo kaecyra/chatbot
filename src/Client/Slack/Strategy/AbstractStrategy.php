@@ -5,24 +5,23 @@
  * @copyright 2016-2017 Tim Gunter
  */
 
-namespace Kaecyra\ChatBot\Client\Slack;
+namespace Kaecyra\ChatBot\Client\Slack\Strategy;
 
 use \Exception;
 
 /**
- * Startup sync strategy
+ * Abstract strategy
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class StartupSyncStrategy {
+class AbstractStrategy {
 
-    protected $phases = [
-        'purge',
-        'channels',
-        'users',
-        'ready'
-    ];
+    /**
+     * Strategy phases
+     * @var array
+     */
+    protected $phases = [];
 
     /**
      * Current phase
@@ -63,6 +62,15 @@ class StartupSyncStrategy {
             return false;
         }
         return $this->phases[($this->phase-1)];
+    }
+
+
+    public function setPhase(string $phaseKey) {
+        $phase = array_search($phaseKey, $this->phases);
+        if ($phase === false) {
+            return;
+        }
+        $this->phase = $phase+1;
     }
 
 }

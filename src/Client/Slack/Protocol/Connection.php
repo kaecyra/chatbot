@@ -10,7 +10,7 @@ namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
-use Kaecyra\ChatBot\Client\Slack\StartupSyncStrategy;
+use Kaecyra\ChatBot\Client\Slack\Strategy\StartupSyncStrategy;
 
 use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
 
@@ -27,6 +27,7 @@ use \Exception;
 class Connection extends AbstractProtocolHandler {
 
     const PING_FREQ = 5;
+    const VERIFY_FREQ = 5;
     const RECONNECT_AFTER = 3;
 
     /**
@@ -40,6 +41,12 @@ class Connection extends AbstractProtocolHandler {
      * @var int
      */
     protected $lastAcknowledged;
+
+    /**
+     * When we last verified pings
+     * @var int
+     */
+    protected $lastVerified;
 
     /**
      * List of outstanding pings
@@ -99,17 +106,19 @@ class Connection extends AbstractProtocolHandler {
      * @param SlackRtmClient $client
      */
     public function action_ping(SlackRtmClient $client) {
-        if (time() >= ($this->lastPing + self::PING_FREQ)) {
-            $this->lastPing = time();
-            $pid = "{$this->lastPing}-".mt_rand(10000,99999);
-            $this->pings[$pid] = [
-                'pingtime' => $this->lastPing,
-                'time' => microtime(true)
-            ];
-            $client->sendMessage('ping', [
-                'pid' => $pid
-            ]);
+        if (time() <= ($this->lastPing + self::PING_FREQ)) {
+            return;
         }
+        $this->lastPing = time();
+
+        $pid = "{$this->lastPing}-".mt_rand(10000,99999);
+        $this->pings[$pid] = [
+            'pingtime' => $this->lastPing,
+            'time' => microtime(true)
+        ];
+        $client->sendMessage('ping', [
+            'pid' => $pid
+        ]);
     }
 
     /**
@@ -145,7 +154,7 @@ class Connection extends AbstractProtocolHandler {
         }
 
         unset($this->pings[$pid]);
-        $this->tLog(LogLevel::NOTICE, "Server sent verified 'pong' (took {elapsed}).", [
+        $this->tLog(LogLevel::INFO, "Server sent verified 'pong' (took {elapsed}).", [
             'elapsed_raw' => $elapsedSeconds,
             'elapsed' => $elapsedFormat
         ]);
@@ -157,6 +166,10 @@ class Connection extends AbstractProtocolHandler {
      * @param SlackRtmClient $client
      */
     public function action_verify_pings(SlackRtmClient $client) {
+        if (time() <= ($this->lastVerified + self::VERIFY_FREQ)) {
+            return;
+        }
+        $this->lastVerified = time();
 
         // First, unset all pings older than the most recent one received
         $pids = array_keys($this->pings);
@@ -169,6 +182,11 @@ class Connection extends AbstractProtocolHandler {
 
         // Count how many remain
         $outstanding = count($this->pings);
+
+        $this->tLog(LogLevel::DEBUG, "{outstanding} pings are unanswered.", [
+            'outstanding' => $outstanding
+        ]);
+
         if ($outstanding <= 1) {
             return;
         }

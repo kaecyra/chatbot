@@ -22,11 +22,21 @@ abstract class Mappable implements MappableInterface {
     protected $mappableProperties;
 
     /**
+     * Property key for hash generation
+     * @var string
+     */
+    protected $mapHashKey;
+
+    /**
      * Set list of mapped properties
      *
      * @param array $properties
      */
-    public function setMappedProperties(array $properties) {
+    public function setMappedProperties(string $hashKey, array $properties) {
+        if (!array_key_exists($hashKey, $properties)) {
+            throw new \Exception("Hash key must be one of the mapped properties.");
+        }
+        $this->mapHashKey = $hashKey;
         $this->mappableProperties = $properties;
     }
 
@@ -49,6 +59,15 @@ abstract class Mappable implements MappableInterface {
     }
 
     /**
+     * Get map hash
+     *
+     * @return string
+     */
+    public function getMapHash(): string {
+        return sha1($this->getMapType()."-".$this->getProperty($this->mapHashKey));
+    }
+
+    /**
      * Get property value
      *
      * @param string $property
@@ -62,6 +81,24 @@ abstract class Mappable implements MappableInterface {
         if (is_callable($this->mappableProperties[$property])) {
             return call_user_func($this->mappableProperties[$property]);
         }
+    }
+
+    /**
+     * Default stale handling
+     *
+     * @return string
+     */
+    public function getStaleHandling(): string {
+        return MappableInterface::NO_EXPIRE;
+    }
+
+    /**
+     * Default expiry
+     *
+     * @return int
+     */
+    public function getExpiry(): int {
+        return 0;
     }
 
 }

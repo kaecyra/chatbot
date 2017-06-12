@@ -10,7 +10,7 @@ namespace Kaecyra\ChatBot\Bot;
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
 /**
- * Core bot persona
+ * Message object
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot

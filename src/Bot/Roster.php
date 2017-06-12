@@ -9,16 +9,8 @@ namespace Kaecyra\ChatBot\Bot;
 
 use Kaecyra\ChatBot\Bot\Map\Map;
 
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
-
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
-use Psr\Log\LoggerAwareInterface;
-use Psr\Log\LoggerAwareTrait;
-use Psr\Log\LogLevel;
 
 /**
  * Server roster manager
@@ -28,22 +20,30 @@ use Psr\Log\LogLevel;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class Roster extends Map implements LoggerAwareInterface, EventAwareInterface, TaggedLogInterface {
+class Roster extends Map implements EventAwareInterface {
 
-    use LoggerAwareTrait;
-    use LoggerBoilerTrait;
-    use TaggedLogTrait;
     use EventAwareTrait;
 
     /**
      * Get a User
-     * 
+     *
      * @param string $key
      * @param mixed $lookup
-     * @return User
+     * @return User|false
      */
     public function getUser(string $key, $lookup) {
-        return $this->unmap('User', $key, $lookup);
+        return $this->unmap(User::getMapType(), $key, $lookup);
+    }
+
+    /**
+     * Get a Conversation
+     *
+     * @param string $key
+     * @param mixed $lookup
+     * @return User|false
+     */
+    public function getConversation(string $key, $lookup) {
+        return $this->unmap(Conversation::getMapType(), $key, $lookup);
     }
 
     /**
@@ -51,10 +51,10 @@ class Roster extends Map implements LoggerAwareInterface, EventAwareInterface, T
      *
      * @param string $key
      * @param mixed $lookup
-     * @return Room
+     * @return Room|false
      */
     public function getRoom(string $key, $lookup) {
-        return $this->unmap('Room', $key, $lookup);
+        return $this->unmap(Room::getMapType(), $key, $lookup);
     }
 
 }

@@ -115,13 +115,16 @@ abstract class SocketClient extends AbstractClient {
                 $this->tLog(LogLevel::DEBUG, " initial connect");
             }
 
-            if ($this->retry <= self::RETRY_RECONNECT) {
+            if ($this->retry == self::RETRY_RECONNECT) {
                 $this->retry = self::RETRY_DELAY;
                 $this->tLog(LogLevel::WARNING, " retrying in {$this->retry} sec");
+                return;
             }
 
-            if (!$this->retry) {
+            if ($this->retry == self::RETRY_CONNECT) {
+                
                 $this->connect();
+
             } else {
                 $this->retry--;
             }
@@ -189,6 +192,13 @@ abstract class SocketClient extends AbstractClient {
             $this->setDSN($connectionDSN);
         }
 
+        // Check internet
+        if (!$this->haveConnectivity()) {
+            $this->retry = self::RETRY_RECONNECT;
+            $this->tLog(LogLevel::WARNING, "No internet connection");
+            return;
+        }
+
         $this->retry = self::RETRY_RECONNECT;
         $this->tLog(LogLevel::NOTICE, " connecting socket client: {dsn}", [
             'dsn' => $this->getDSN()
@@ -233,6 +243,22 @@ abstract class SocketClient extends AbstractClient {
     }
 
     /**
+     * Test internet connectivity
+     *
+     * @return boolean
+     */
+    public function haveConnectivity() {
+        $connected = @fsockopen("www.google.com", 80);
+        if ($connected) {
+            $is_conn = true;
+            fclose($connected);
+        }else{
+            $is_conn = false;
+        }
+        return $is_conn;
+    }
+
+    /**
      *
      */
     public function reconnect() {
@@ -257,7 +283,7 @@ abstract class SocketClient extends AbstractClient {
      * @param array $data
      */
     public function sendMessage(string $method, array $data = []) {
-        $this->tLog(LogLevel::INFO, "send socket message: {$method}");
+        $this->tLog(LogLevel::DEBUG, "send socket message: {$method}");
 
         $message = $this->getMessage(self::MESSAGE_OUTBOUND);
         $message->populate($method, $data);
@@ -271,13 +297,13 @@ abstract class SocketClient extends AbstractClient {
      * @param SocketMessageInterface $socketMessage
      */
     public function onSocketMessage(SocketMessageInterface $socketMessage) {
-        $this->tLog(LogLevel::INFO, "socket message received");
+        $this->tLog(LogLevel::DEBUG, "socket message received");
 
         try {
             $message = $this->getMessage(self::MESSAGE_INBOUND);
             $message->ingest($socketMessage);
 
-            $this->tLog(LogLevel::INFO, "socket message method: ".$message->getMethod());
+            $this->tLog(LogLevel::DEBUG, "socket message method: ".$message->getMethod());
 
             // Route to message handler
             $this->fire('socket_message', [$message]);

@@ -10,8 +10,10 @@ namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
+use Kaecyra\ChatBot\Bot\Persona;
 use Kaecyra\ChatBot\Bot\Roster;
 use Kaecyra\ChatBot\Bot\User;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
 
 use Psr\Log\LogLevel;
 
@@ -36,12 +38,35 @@ class Users extends AbstractProtocolHandler {
     /**
      * Handle presence changes
      *
-     * @param SlackRtmClient $client
+     * @param Persona $persona
+     * @param Roster $roster
      * @param MessageInterface $message
+     * @return type
      */
-    public function message_presence_change(SlackRtmClient $client, Roster $roster, MessageInterface $message) {
-        $this->tLog(LogLevel::NOTICE, "Server sent 'presence_change'.");
-        
+    public function message_presence_change(Persona $persona, Roster $roster, MessageInterface $message) {
+        $uid = $message->get('user');
+
+        try {
+            $user = $roster->getUser('id', $uid);
+        } catch (MapNotFoundException $ex) {
+            $this->tLog(LogLevel::WARNING, "Could not update presence for user '{uid}'. {reason}", [
+                'uid' => $uid,
+                'reason' => $ex->getMessage()
+            ]);
+            return;
+        }
+
+        $presence = $message->get('presence');
+        $old = $user->getPresence();
+        $this->tLog(LogLevel::NOTICE, "{user} ({uid}) is now {presence} (was {old})", [
+            'user' => $user->getName(),
+            'uid' => $user->getID(),
+            'old' => $old,
+            'presence' => $presence
+        ]);
+
+        $user->setPresence($presence);
+        $persona->onPresenceChange($user);
     }
 
 }

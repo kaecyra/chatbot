@@ -8,14 +8,21 @@
 namespace Kaecyra\ChatBot\Bot;
 
 use Kaecyra\ChatBot\Bot\Map\Mappable;
+use Kaecyra\ChatBot\Bot\Map\MappableInterface;
+use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
 
 /**
- * Core bot persona
+ * User object
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class Room extends Mappable {
+class Room extends Mappable implements DestinationInterface {
+
+    use DataAccessTrait;
+
+    const ROSTER_STALE = MappableInterface::STALE_RETURN_REFRESH_ASYNC;
+    const ROSTER_EXPIRY = 300;
 
     protected $id;
 
@@ -44,10 +51,26 @@ class Room extends Mappable {
         $this->name = $name;
         $this->topic = '';
 
-        $this->setMappedProperties([
+        $this->setMappedProperties('id', [
             'id' => function(){return $this->getID();},
             'name' => function(){return $this->getName();}
         ]);
+    }
+
+    /**
+     * Override stale object handling
+     * @return string
+     */
+    public function getStaleHandling(): string {
+        return self::ROSTER_STALE;
+    }
+
+    /**
+     * Override object expiry
+     * @return int
+     */
+    public function getExpiry(): int {
+        return self::ROSTER_EXPIRY;
     }
 
     /**
@@ -110,6 +133,30 @@ class Room extends Mappable {
     public function setState(string $state): Room {
         $this->state = $state;
         return $this;
+    }
+
+    /**
+     * Add member to room
+     * @param User $user
+     */
+    public function addMember(User $user) {
+        $this->members[$user->getID()] = true;
+    }
+
+    /**
+     * Remove member from room
+     * @param User $user
+     */
+    public function removeMember(User $user) {
+        unset($this->members[$user->getID()]);
+    }
+
+    /**
+     * Get list of userid that are in the channel
+     * @return array
+     */
+    public function getMembers(): array {
+        return array_keys($this->members);
     }
 
     /**

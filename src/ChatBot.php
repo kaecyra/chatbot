@@ -13,6 +13,8 @@ use Kaecyra\ChatBot\Client\ClientInterface;
 use Kaecyra\ChatBot\Client\AbstractClient;
 
 use Kaecyra\ChatBot\Bot\Persona;
+use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Bot\Command\FluidCommand;
 
 use Garden\Daemon\Daemon;
 use Garden\Daemon\AppInterface;
@@ -196,19 +198,8 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         $clientType = $config->get('client.type');
         $clientHandler = $config->get("client.{$clientType}.handler");
         if (!$container->has($clientHandler)) {
-            throw new Exception("Unknown client handler: {$clientHandler}");
+            throw new \Exception("Unknown client handler: {$clientHandler}");
         }
-
-//        $clientSettings = $config->get("connect.{$clientType}");
-//
-//        $container
-//            ->rule(ClientInterface::class)
-//            ->addAlias(AbstractClient::class)
-//            ->addAlias($clientHandler)
-//            ->setClass($clientHandler)
-//            ->setConstructorArgs([
-//                'settings' => $clientSettings
-//            ]);
 
         $container
             ->rule(ClientInterface::class)
@@ -229,6 +220,14 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
                 return $client;
             })
             ->setShared(true);
+
+        $container
+            ->rule(Roster::class)
+            ->setShared(true);
+
+        $container
+            ->rule(FluidCommand::class)
+            ->setShared(false);
     }
 
     /**

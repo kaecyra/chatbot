@@ -58,9 +58,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
             'token' => substr($token, 0, 5).str_repeat('*', strlen($token)-10).substr($token, -5)
         ]);
 
-        $this
-            ->setDefaultHeader('Content-Type', 'application/json; charset=utf8')
-            ->setDefaultHeader('Accept', 'application/json');
+        $this->setDefaultHeader('Accept', 'application/json');
     }
 
     /**
@@ -206,8 +204,64 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
         ]);
     }
 
+    /**
+     * Open an IM with a user
+     *
+     * @param string $user
+     * @return HttpResponse
+     */
+    public function im_open(string $user): HttpResponse {
+        return $this->get('/im.open', [
+            'user' => $user
+        ]);
+    }
 
+    /**
+     * Close an IM with a user
+     *
+     * @param string $channel
+     * @return HttpResponse
+     */
+    public function im_close(string $channel): HttpResponse {
+        return $this->get('/im.close', [
+            'channel' => $channel
+        ]);
+    }
 
+    /**
+     * List IMs
+     *
+     * @return HttpResponse
+     */
+    public function im_list(): HttpResponse {
+        return $this->get('/im.list');
+    }
+
+    /**
+     * Post a chat message
+     *
+     * @param string $channel
+     * @param string $text
+     * @param array $attachments
+     * @param array $options
+     * @return HttpResponse
+     */
+    public function chat_post_message(string $channel, string $text, array $attachments = [], array $options = []): HttpResponse {
+        $defaults = [
+            'as_user' => true
+        ];
+        $payload = [
+            'channel' => $channel,
+            'text' => $text
+        ];
+
+        if (count($attachments)) {
+            $payload['attachments'] = json_encode($attachments);
+        }
+
+        $payload = array_merge($defaults, $options, $payload);
+        return $this->post('/chat.postMessage', $payload);
+    }
 
 
 }

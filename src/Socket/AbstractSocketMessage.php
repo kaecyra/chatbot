@@ -50,7 +50,7 @@ abstract class AbstractSocketMessage extends Store implements MessageInterface {
      */
     public function populate(string $method, array $data): MessageInterface {
         $this->method = $method;
-        $this->data = $data;
+        $this->prepare($data);
         return $this;
     }
 
@@ -80,7 +80,7 @@ abstract class AbstractSocketMessage extends Store implements MessageInterface {
      * @return array
      */
     public function getData(): array {
-        return $this->data;
+        return $this->dump();
     }
 
     /**
@@ -90,7 +90,7 @@ abstract class AbstractSocketMessage extends Store implements MessageInterface {
      * @return SocketMessage
      */
     public function setData(array $data): MessageInterface {
-        $this->data = $data;
+        $this->prepare($data);
         return $this;
     }
 

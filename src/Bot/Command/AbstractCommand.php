@@ -16,6 +16,12 @@ namespace Kaecyra\ChatBot\Bot\Command;
 abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
 
     /**
+     * Command create time
+     * @var int
+     */
+    protected $createTime;
+
+    /**
      * Command supplemental data
      * @var array
      */
@@ -27,9 +33,16 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
      */
     protected $command;
 
+    /**
+     * Expiry delta
+     * @var int
+     */
+    protected $expiry;
 
     public function __construct() {
         $this->setCommand('');
+        $this->createTime = time();
+        $this->expiry = 0;
         $this->data = [];
     }
 
@@ -50,6 +63,15 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
     public function setCommand(string $command): CommandInterface {
         $this->command = $command;
         return $this;
+    }
+
+    /**
+     * Test whether we have a command
+     * 
+     * @return bool
+     */
+    public function haveCommand(): bool {
+        return !empty($this->command) && strlen($this->command);
     }
 
     /**
@@ -139,6 +161,35 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
      */
     public function offsetUnset($offset) {
         unset($this->data[$offset]);
+    }
+
+    /**
+     * Set expiry
+     *
+     * @param int $delta
+     * @return $this
+     */
+    public function setExpiry(int $delta) {
+        $this->expiry = $delta;
+        return $this;
+    }
+
+    /**
+     * Get expiry
+     *
+     * @return int
+     */
+    public function getExpiry(): int {
+        return $this->expiry;
+    }
+
+    /**
+     * Check expiry
+     *
+     * @return bool
+     */
+    public function isExpired(): bool {
+        return $this->expiry ? (($this->expiry + $this->createTime) < time()) : false;
     }
 
 

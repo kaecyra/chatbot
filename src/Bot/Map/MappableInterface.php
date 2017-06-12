@@ -15,6 +15,10 @@ namespace Kaecyra\ChatBot\Bot\Map;
  */
 interface MappableInterface {
 
+    const NO_EXPIRE = 'no_expire';
+    const STALE_RETURN = 'stale_return';
+    const STALE_RETURN_REFRESH_ASYNC = 'stale_return_refresh_async';
+
     /**
      * Get mapped properties
      *
@@ -32,11 +36,36 @@ interface MappableInterface {
     public static function getMapType(): string;
 
     /**
+     * Get map hash
+     *
+     * Each object should be able to return a hash representing itself uniquely.
+     *
+     * @return string
+     */
+    public function getMapHash(): string;
+
+    /**
      * Get property value
      *
      * @param string $property
      * @return mixed
      */
     public function getProperty(string $property);
+
+    /**
+     * Get stale handling technique
+     *
+     * @return string
+     */
+    public function getStaleHandling(): string;
+
+    /**
+     * Get expiry length
+     *
+     * 0 means doesn't expire
+     *
+     * @return int
+     */
+    public function getExpiry(): int;
 
 }
