@@ -11,6 +11,7 @@ use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
 use Kaecyra\ChatBot\Client\ClientInterface;
 use Kaecyra\ChatBot\Client\AbstractClient;
+use Kaecyra\ChatBot\Utility\Cache;
 
 use Kaecyra\ChatBot\Bot\Persona;
 use Kaecyra\ChatBot\Bot\Roster;
@@ -220,6 +221,32 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
                 return $client;
             })
             ->setShared(true);
+
+        // Prepare cache driver
+
+        $container
+            ->rule(\Memcached::class)
+            ->setFactory(function(
+                ConfigInterface $config
+            ) {
+                $cache = new \Memcached;
+                $cacheNodes = $config->get('cache.nodes');
+                foreach ($cacheNodes as $node) {
+                    $cache->addServer($node[0], $node[1]);
+                }
+                return $cache;
+            })
+            ->setShared(true);
+
+        // Prepare the cache wrapper
+
+        $container
+            ->rule(Cache::class)
+            ->addCall('setRevisionKey', ['cache.state.revision'])
+            ->addCall('setTagFormat', ['rev-%d'])
+            ->addCall('setKeyFormat', ['%s!%s']);
+
+        // Prepare bot objects
 
         $container
             ->rule(Roster::class)

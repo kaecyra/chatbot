@@ -7,9 +7,6 @@
         "mode": "single"
     },
     "addons": {
-        "active": {
-            
-        },
         "scan": [
             "addons/",
             "vendors/"
