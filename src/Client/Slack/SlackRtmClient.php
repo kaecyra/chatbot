@@ -267,9 +267,8 @@ class SlackRtmClient extends SocketClient {
      * Receive socket error event
      *
      * @param string $reason
-     * @param WebSocket $connection
      */
-    public function onError(string $reason, WebSocket $connection) {
+    public function onError($code = null, $reason = null) {
 
     }
 

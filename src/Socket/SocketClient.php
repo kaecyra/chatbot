@@ -122,7 +122,7 @@ abstract class SocketClient extends AbstractClient {
             }
 
             if ($this->retry == self::RETRY_CONNECT) {
-                
+
                 $this->connect();
 
             } else {
@@ -346,7 +346,7 @@ abstract class SocketClient extends AbstractClient {
 
         // Propagate error event
         $this->fire('socket_error');
-        $this->onError($reason, $connection);
+        $this->onError(null, $reason);
     }
 
 }

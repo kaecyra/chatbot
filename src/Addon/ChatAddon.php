@@ -13,7 +13,7 @@ use Kaecyra\AppCommon\Addon\AbstractAddon;
 use Kaecyra\AppCommon\Store;
 
 /**
- * Abstract Command
+ * Abstract Chat Addon
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot

@@ -38,6 +38,6 @@ interface ClientInterface {
     public function onClose($code = null, $reason = null);
 
 
-    public function onError(string $reason, WebSocket $connection);
+    public function onError($code = null, $reason = null);
 
 }
