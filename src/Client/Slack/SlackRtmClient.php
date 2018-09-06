@@ -421,7 +421,7 @@ class SlackRtmClient extends SocketClient {
 
                 $scopes = [
                     'public' => $this->web->channels_list(false, true)->getBody()['channels'] ?? [],
-                    'private' => $this->web->groups_list(false, true)->getBody()['channels'] ?? []
+                    'private' => $this->web->groups_list(false)->getBody()['groups'] ?? []
                 ];
                 foreach ($scopes as $scope => $channels) {
                     $this->tLog(LogLevel::INFO, " Indexing {scope} channels", [
