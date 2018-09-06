@@ -140,7 +140,10 @@ class SlackRtmClient extends SocketClient {
         // Prepare web client
         $this->web->initialize($this->settings['web']['hostname'], $this->settings['token']);
 
-        $this->setDSN($this->settings['socket']['hostname']);
+        // Allow custom socket dsn if desired
+        if ($this->settings['rtm']['dsn']) {
+            $this->setDSN($this->settings['rtm']['dsn']);
+        }
 
         // Mark configured
         $this->setState(ClientInterface::STATE_CONFIGURED);
