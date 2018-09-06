@@ -345,7 +345,7 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
     public function run($workerConfig) {
 
         $this->log(LogLevel::NOTICE, "ChatBot starting");
-
+        
         $this->container->get(ClientInterface::class);
 
         // Get persona

@@ -138,7 +138,9 @@ class SlackRtmClient extends SocketClient {
         });
 
         // Prepare web client
-        $this->web->initialize($this->settings['web']['api'], $this->settings['token']);
+        $this->web->initialize($this->settings['web']['hostname'], $this->settings['token']);
+
+        $this->setDSN($this->settings['socket']['hostname']);
 
         // Mark configured
         $this->setState(ClientInterface::STATE_CONFIGURED);
@@ -266,6 +268,7 @@ class SlackRtmClient extends SocketClient {
     /**
      * Receive socket error event
      *
+     * @param int $code
      * @param string $reason
      */
     public function onError($code = null, $reason = null) {
