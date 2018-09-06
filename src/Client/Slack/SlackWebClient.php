@@ -131,6 +131,19 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
     }
 
     /**
+     * Get all channels
+     *
+     * @param bool $archived optional. include archived channels. default false.
+     * @return HttpResponse
+     */
+    public function conversations_list(bool $archived = false): HttpResponse {
+        return $this->get('/conversations.list', [
+            'types' => 'public_channel,private_channel',
+            'exclude_archived' => !$archived ? 'true' : 'false'
+        ]);
+    }
+
+    /**
      * Get public channels
      *
      * @param bool $archived optional. include archived channels. default false.
