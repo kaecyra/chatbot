@@ -49,14 +49,40 @@ class Channels extends AbstractProtocolHandler {
     }
 
     /**
+     * Ingest and map a room
+     *
+     * @param Roster $roster
+     * @param array $room
+     */
+    protected function ingestRoom(Roster $roster, array $room) {
+        $roomObject = new Room($room['id'], $room['name']);
+        $roomObject->setTopic($room['purpose']['value'] ?? "");
+        $roomObject->setData($room);
+
+        if (isset($room['members']) && is_array($room['members'])) {
+            foreach ($room['members'] as $member) {
+                $mid = $member['id'];
+                try {
+                    $user = $roster->getUser('id', $mid);
+                } catch (MapNotFoundException $ex) {
+                    continue;
+                }
+                $roomObject->addMember($user);
+            }
+        }
+
+        $roster->map($roomObject);
+    }
+
+    /**
      * Handle bot joins
      *
      * @param Roster $roster
      * @param BotUser $user
      * @param MessageInterface $message
-     * @return type
      */
     public function message_channel_joined(Persona $persona, Roster $roster, BotUser $user, MessageInterface $message) {
+        $this->ingestRoom($roster, $message->get('channel'));
         try {
             $roomObject = $roster->getRoom('id', $message->get('channel.id'));
         } catch (MapNotFoundException $ex) {
@@ -74,9 +100,9 @@ class Channels extends AbstractProtocolHandler {
      * @param Roster $roster
      * @param BotUser $user
      * @param MessageInterface $message
-     * @return type
      */
     public function message_channel_left(Persona $persona, Roster $roster, BotUser $user, MessageInterface $message) {
+        $this->ingestRoom($roster, $message->get('channel'));
         try {
             $roomObject = $roster->getRoom('id', $message->get('channel'));
         } catch (MapNotFoundException $ex) {
@@ -93,9 +119,9 @@ class Channels extends AbstractProtocolHandler {
      *
      * @param Roster $roster
      * @param MessageInterface $message
-     * @return type
      */
     public function message_member_joined_channel(Persona $persona, Roster $roster, MessageInterface $message) {
+        $this->ingestRoom($roster, $message->get('channel'));
         $reason = "";
         try {
             $userObject = $roster->getUser('id', $message->get('user'));
@@ -119,9 +145,9 @@ class Channels extends AbstractProtocolHandler {
      *
      * @param Roster $roster
      * @param MessageInterface $message
-     * @return type
      */
     public function message_member_left_channel(Persona $persona, Roster $roster, MessageInterface $message) {
+        $this->ingestRoom($roster, $message->get('channel'));
         try {
             $userObject = $roster->getUser('id', $message->get('user'));
             $roomObject = $roster->getRoom('id', $message->get('channel'));
