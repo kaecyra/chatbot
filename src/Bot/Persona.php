@@ -287,8 +287,8 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
 
         $botUserObject = $this->container->get(BotUser::class);
         $botNames = [
-            strtolower($botUserObject->getName()),
-            strtolower($botUserObject->getReal())
+            strtolower($botUserObject->getReal()),
+            strtolower($botUserObject->getName())
         ];
 
         foreach ($botNames as $botName) {
