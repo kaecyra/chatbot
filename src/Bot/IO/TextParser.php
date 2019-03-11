@@ -5,26 +5,38 @@
  * @copyright 2014-2017 Tim Gunter
  */
 
-namespace Kaecyra\ChatBot\Bot\Command;
-
-use Kaecyra\AppCommon\Event\EventAwareInterface;
-use Kaecyra\AppCommon\Event\EventAwareTrait;
+namespace Kaecyra\ChatBot\Bot\IO\TextParser;
+use Kaecyra\ChatBot\Bot\Command\CommandInterface;
+use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
 
 /**
- * Fluid command parser
+ * Text parser
+ *
+ * This object implements ArrayAccess so that msot of its contents can be accessed
+ * as an array.
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class FluidCommand extends AbstractCommand implements EventAwareInterface {
+class TextParser implements \ArrayAccess {
 
-    use EventAwareTrait;
+    /**
+     * Parser create time
+     * @var int
+     */
+    protected $createTime;
+
+    /**
+     * Command supplemental data
+     * @var array
+     */
+    protected $data;
 
     /**
      * Initial input string
      * @var string
      */
-    protected $inputstring;
+    protected $inputString;
 
     /**
      * Constructor
@@ -33,7 +45,7 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
      * @param array $initial optional
      */
     public function __construct(string $input, array $initial = []) {
-        parent::__construct();
+        $this->createTime = time();
 
         if (!is_array($initial)) {
             $initial = [];
@@ -48,7 +60,7 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
      * @return string
      */
     public function getInputString() {
-        return $this->inputstring;
+        return $this->inputString;
     }
 
     /**
@@ -59,11 +71,10 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
      *
      * @param string $inputString
      * @param array $initial
-     * @return CommandInterface
+     * @return TextParser
      */
-    public function setInputString(string $inputString, array $initial): CommandInterface {
-        $this->inputstring = $inputString;
-        $this->setCommand('');
+    public function setInputString(string $inputString, array $initial): TextParser {
+        $this->inputString = $inputString;
 
         $defaults = [
             'targets' => [],
@@ -134,16 +145,17 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
     /**
      * Internal analyze method
      *
-     * @return CommandInterface
+     * @param InteractiveCommand $command
+     * @return TextParser
      */
-    public function analyze(): CommandInterface {
+    public function analyzeFor(InteractiveCommand $command): TextParser {
 
         $this->pieces = explode(' ', $this->getInputString());
         $this->parts = $this['pieces'];
 
         // Scan phase, allows gathering unprefixed tokens
         foreach ($this->parts as $part) {
-            $this->fire('tokenscan', [$this, $part]);
+            $command->fire('tokenscan', [$this, $part]);
         }
 
         $this->nextToken();
@@ -177,7 +189,7 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
                     if (count($boundaries)) {
                         foreach ($boundaries as $boundary) {
                             if ($this->token == $boundary) {
-                                $this->addTarget($loop['node'], $this->gather['delta'], $loop['multi']);
+                                $command->addTarget($loop['node'], $this->gather['delta'], $loop['multi']);
                                 $this->gather = false;
                                 $loop['type'] = false;
                                 break;
@@ -213,7 +225,7 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
 
                             $checkPhrase = trim($this->gather['delta']);
                             $this->gather = false;
-                            $this->addTarget($loop['node'], $checkPhrase, $loop['multi']);
+                            $command->addTarget($loop['node'], $checkPhrase, $loop['multi']);
                             break;
                         }
                         break;
@@ -232,14 +244,32 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
                         $currentDelta = trim($this->gather['delta']);
                         if (strlen($currentDelta) && is_numeric($currentDelta)) {
                             $this->gather = false;
-                            $this->addTarget($loop['node'], $currentDelta, $loop['multi']);
+                            $command->addTarget($loop['node'], $currentDelta, $loop['multi']);
+                            break;
+                        }
+                        break;
+
+                    case 'word':
+
+                        // Add token
+                        if (strlen($this->gather['delta'])) {
+                            $this->gather['delta'] .= ' ';
+                        }
+                        $this->gather['delta'] .= $this->token;
+                        $this->consume();
+
+                        // If we're closed, close up
+                        $currentDelta = trim($this->gather['delta']);
+                        if (strlen($currentDelta)) {
+                            $this->gather = false;
+                            $command->addTarget($loop['node'], $currentDelta, $loop['multi']);
                             break;
                         }
                         break;
 
                     // Hook for custom tokens
                     default:
-                        $this->fire('tokengather', [$this, $loop]);
+                        $command->fire('tokengather', [$this, $loop]);
                         break;
                 }
 
@@ -251,13 +281,13 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
             } else {
 
                 // Fire stem gathering
-                $this->fire('stems', [$this]);
+                $command->fire('stems', [$this]);
 
                 // Fire method gathering
-                $this->fire('methods', [$this]);
+                $command->fire('methods', [$this]);
 
                 // Fire enhancements
-                $this->fire('enhancements', [$this]);
+                $command->fire('enhancements', [$this]);
 
                 /*
                  * FOR, BECAUSE
@@ -270,7 +300,7 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
                 /*
                  * Allow consume overrides in plugins
                  */
-                $this->fire('token', [$this]);
+                $command->fire('token', [$this]);
 
                 // Allow fast gathering!
                 if ($this->gathering() && val('fast', $this->gather)) {
@@ -298,18 +328,18 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
         // Terminate any open gathers
         if ($this->gather) {
             $loop['node'] = $this->gather['node'];
-            $this->addTarget($loop['node'], $this->gather['delta']);
+            $command->addTarget($loop['node'], $this->gather['delta']);
             $this->gather = false;
         }
 
         // Gather any remaining tokens into the 'gravy' field
-        if ($this->getCommand()) {
+        if ($command->getCommand()) {
             $gravy = array_slice($this->pieces, $this->tokens);
             $this->gravy = implode(' ', $gravy);
         }
 
         if ($this->consume) {
-            $this->cleanupConsume($this);
+            $this->cleanupConsume();
         }
 
         // Parse this resolved state into potential actions
@@ -472,39 +502,6 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
     }
 
     /**
-     * Add a target
-     *
-     * @param string $name
-     * @param mixed $data
-     * @param boolean $multi optional. default false.
-     */
-    public function addTarget($name, $data, $multi = false) {
-        // Prepare the target
-        if ($multi) {
-            if (isset($this->targets[$name])) {
-                if (!is_array($this->targets[$name])) {
-                    $this->targets[$name] = [$this->targets[$name]];
-                }
-            } else {
-                $this->targets[$name] = [];
-            }
-            array_push($this->targets[$name], $data);
-        } else {
-            $this->targets[$name] = $data;
-        }
-    }
-
-    /**
-     * Test if we have a given target
-     *
-     * @param string $name
-     * @return boolean
-     */
-    public function haveTarget($name): bool {
-        return (isset($this->targets[$name]) && !empty($this->targets[$name]));
-    }
-
-    /**
      * Cleanup consume
      *
      */
@@ -574,6 +571,95 @@ class FluidCommand extends AbstractCommand implements EventAwareInterface {
         foreach ($unset as $unsetKey) {
             unset($this->for[$unsetKey]);
         }
+    }
+
+    /**
+     * Get token/piece by index
+     *
+     * @param integer $index
+     * @return string|null
+     */
+    public function index($index) {
+        return $this->data['pieces'][$index] ?? null;
+    }
+
+    /**
+     * Get data by key
+     *
+     * @param string $key
+     */
+    public function &__get ($key) {
+        return $this->data[$key];
+    }
+
+    /**
+     * Assigns value by key
+     *
+     * @param string $key
+     * @param mixed $value value to set
+     */
+    public function __set($key, $value) {
+        $this->data[$key] = $value;
+    }
+
+    /**
+     * Whether or not data exists by key
+     *
+     * @param string $key to check for
+     * @return boolean
+     */
+    public function __isset($key) {
+        return isset($this->data[$key]);
+    }
+
+    /**
+     * Unset data by key
+     *
+     * @param string $key
+     */
+    public function __unset($key) {
+        unset($this->data[$key]);
+    }
+
+    /**
+     * Check if offset exists
+     *
+     * @param mixed $offset
+     */
+    public function offsetExists($offset) {
+        return isset($this->data[$offset]);
+    }
+
+    /**
+     * Set value on offset
+     *
+     * @param mixed $offset
+     * @param mixed $value
+     */
+    public function offsetSet($offset, $value) {
+        if (is_null($offset)) {
+            $this->data[] = $value;
+        } else {
+            $this->data[$offset] = $value;
+        }
+    }
+
+    /**
+     * Get offset value
+     *
+     * @param mixed $offset
+     */
+    public function offsetGet($offset) {
+        return isset($this->data[$offset]) ? $this->data[$offset] : null;
+    }
+
+    /**
+     * Unset offset
+     *
+     * @param mixed $offset
+     */
+    public function offsetUnset($offset) {
+        unset($this->data[$offset]);
     }
 
 }

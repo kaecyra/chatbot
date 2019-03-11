@@ -7,6 +7,7 @@
 
 namespace Kaecyra\ChatBot;
 
+use Kaecyra\ChatBot\Bot\Command\CommandInterface;
 use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
 use Kaecyra\ChatBot\Client\ClientInterface;
@@ -15,7 +16,7 @@ use Kaecyra\ChatBot\Utility\Cache;
 
 use Kaecyra\ChatBot\Bot\Persona;
 use Kaecyra\ChatBot\Bot\Roster;
-use Kaecyra\ChatBot\Bot\Command\FluidCommand;
+use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
 
 use Garden\Daemon\Daemon;
 use Garden\Daemon\AppInterface;
@@ -253,7 +254,7 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
             ->setShared(true);
 
         $container
-            ->rule(FluidCommand::class)
+            ->rule(CommandInterface::class)
             ->setShared(false);
     }
 

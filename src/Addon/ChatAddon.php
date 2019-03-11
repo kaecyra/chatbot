@@ -32,7 +32,13 @@ abstract class ChatAddon extends AbstractAddon {
      */
     protected $store;
 
-    public function __construct(ClientInterface $client, $config = array()) {
+    /**
+     * ChatAddon constructor.
+     *
+     * @param ClientInterface $client
+     * @param array $config
+     */
+    public function __construct(ClientInterface $client, $config = []) {
         parent::__construct($config);
 
         $this->client = $client;

@@ -21,7 +21,7 @@ use Kaecyra\ChatBot\Bot\DestinationInterface;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class User extends Mappable implements DestinationInterface {
+class User extends Mappable implements UserInterface, DestinationInterface {
 
     use DataAccessTrait;
 

@@ -7,12 +7,14 @@
 
 namespace Kaecyra\ChatBot\Bot;
 
+use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
+use Kaecyra\ChatBot\Bot\Command\UserDestination;
+use Kaecyra\ChatBot\Bot\IO\TextParser\TextParser;
 use Kaecyra\ChatBot\Client\ClientInterface;
 use Kaecyra\ChatBot\Client\AsyncEvent;
 
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
 use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
-use Kaecyra\ChatBot\Bot\Command\FluidCommand;
 
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
@@ -81,20 +83,35 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
     protected $store;
 
     /**
+     * Pending / active commands
+     * @var array<InteractiveCommand>
+     */
+    protected $commands;
+
+    /**
+     * Command Router
+     * @var CommandRouter
+     */
+    protected $router;
+
+    /**
      *
      * @param ContainerInterface $container
      * @param ClientInterface $client
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param LoopInterface $loop
      */
     public function __construct(
         ContainerInterface $container,
         ClientInterface $client,
+        CommandRouter $router,
         Roster $roster,
         LoopInterface $loop
     ) {
         $this->container = $container;
         $this->client = $client;
+        $this->router = $router;
         $this->loop = $loop;
         $this->roster = $roster;
 
@@ -117,6 +134,7 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
      */
     public function tick() {
         $this->runAsync();
+        $this->expireCommands();
     }
 
     /**
@@ -193,12 +211,14 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             return;
         }
 
+        // Look for built-in handler on the client
         if (method_exists($this->client, "command_{$commandName}")) {
             $this->container->call([$this->client, "command_{$commandName}"], [
                 'command' => $command
             ]);
         }
 
+        // Fire command event to solicit other handlers
         $calls = $this->fireReturn('command', [$command]);
         foreach ($calls as $call) {
             $this->container->call($call, [
@@ -208,39 +228,61 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
     }
 
     /**
-     * Get the roster
+     * Expire old commands
      *
-     * @return Roster
      */
-    public function getRoster(): Roster {
-        return $this->roster;
-    }
-
-
-    public function onJoin(Room $room, User $user) {
-        $this->fire('join', [
-            $room,
-            $user
-        ]);
-    }
-
-
-    public function onLeave(Room $room, User $user) {
-        $this->fire('leave', [
-            $room,
-            $user
-        ]);
-    }
-
-
-    public function onPresenceChange(User $user) {
-        $this->fire('presence', [
-            $user
-        ]);
+    public function expireCommands() {
+        foreach ($this->commands as $command) {
+            /** @var $command InteractiveCommand */
+            if ($command->isExpired()) {
+                $this->removePendingCommand($command->getUserDestination());
+            }
+        }
     }
 
     /**
-     * Handle a direct message
+     * Gather schema items for command
+     *
+     * @param CommandInterface $command
+     */
+    public function gatherSchema(CommandInterface $command) {
+
+    }
+
+    /**
+     * Check if we have a pending command for given UserDestination
+     *
+     * @param UserDestination $ud
+     * @return bool
+     */
+    public function havePendingCommand(UserDestination $ud) {
+        $udKey = $ud->getKey();
+        return array_key_exists($udKey, $this->commands);
+    }
+
+    /**
+     * Retrieve pending command for UserDestination
+     *
+     * @param UserDestination $ud
+     * @return mixed
+     */
+    public function getPendingCommand(UserDestination $ud) {
+        $udKey = $ud->getKey();
+        return $this->commands[$udKey];
+    }
+
+    /**
+     * Unset pending command for UserDestination
+     *
+     * @param UserDestination $ud
+     */
+    public function removePendingCommand(UserDestination $ud) {
+        $udKey = $ud->getKey();
+        unset($this->commands[$udKey]);
+    }
+
+    /**
+     * Handle a direct message (IM)
      *
      * @param User $userObject
      * @param string $message
@@ -255,12 +297,14 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
 
         $conversationObject = $this->roster->getConversation('userid', $userObject->getID());
 
+        // Fire "privateMessage" event
         $this->fire('privateMessage', [
             $conversationObject,
             $userObject,
             $message
         ]);
 
+        // Fire "directedMessage" event
         $this->onDirectedMessage($conversationObject, $userObject, $message);
     }
 
@@ -326,7 +370,6 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
      * @param DestinationInterface $destinationObject
      * @param User $userObject
      * @param string $message
-     * @return type
      */
     public function onDirectedMessage(DestinationInterface $destinationObject, User $userObject, string $message) {
 
@@ -336,28 +379,101 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             'text' => $message
         ]);
 
-        // Parse command string into state
-        $command = $this->container->getArgs(FluidCommand::class, [$message]);
-        $command->addTarget('destination', $destinationObject);
-        $command->addTarget('user', $userObject);
-        $command->analyze();
+        // Prepare text parser
+        $parser = new TextParser($message);
 
-        $this->fire('directedMessage', [
-            $destinationObject,
-            $userObject,
-            $command
-        ]);
+        // Generate UserDestination tag
+        $ud = new UserDestination($userObject, $destinationObject);
 
-        // If no method was provided, bail out
+        // Lookup or create command
+        if ($this->havePendingCommand($ud)) {
+            $command = $this->getPendingCommand($ud);
+        } else {
+            // Parse command string into state
+            $command = $this->container->getArgs(InteractiveCommand::class, [$ud]);
+            $command->addTarget('destination', $destinationObject);
+            $command->addTarget('user', $userObject);
+        }
+
+        $command->ingestMessage($parser);
+
         if (!$command->getCommand()) {
+            $this->router->route($command);
+        }
+
+        // If no method was detected, bail out
+        if (!$command->getCommand()) {
+
+            // Allow hooks for individual message
+            $this->fire('directedMessage', [
+                $destinationObject,
+                $userObject,
+                $parser
+            ]);
+
             return;
         }
-        $this->tLog(LogLevel::NOTICE, "Command: {command}", [
-            'command' => $command->getCommand()
-        ]);
 
-        // Execute command
-        $this->runCommand($command);
+        if (!$command->isReady()) {
+            $this->tLog(LogLevel::NOTICE, "Gather Schema: {command}", [
+                'command' => $command->getCommand()
+            ]);
+
+            $this->gatherSchema($command);
+        } else {
+            $this->tLog(LogLevel::NOTICE, "Command: {command}", [
+                'command' => $command->getCommand()
+            ]);
+
+            // Execute command
+            $this->runCommand($command);
+        }
+    }
+
+    /**
+     * Get the roster
+     *
+     * @return Roster
+     */
+    public function getRoster(): Roster {
+        return $this->roster;
+    }
+
+    /**
+     * Handle join event
+     *
+     * @param Room $room
+     * @param User $user
+     */
+    public function onJoin(Room $room, User $user) {
+        $this->fire('join', [
+            $room,
+            $user
+        ]);
+    }
+
+    /**
+     * Handle leave event
+     *
+     * @param Room $room
+     * @param User $user
+     */
+    public function onLeave(Room $room, User $user) {
+        $this->fire('leave', [
+            $room,
+            $user
+        ]);
+    }
+
+    /**
+     * Handle user presence change
+     *
+     * @param User $user
+     */
+    public function onPresenceChange(User $user) {
+        $this->fire('presence', [
+            $user
+        ]);
     }
 
     /**

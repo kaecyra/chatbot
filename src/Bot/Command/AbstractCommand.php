@@ -6,6 +6,8 @@
  */
 
 namespace Kaecyra\ChatBot\Bot\Command;
+use Kaecyra\AppCommon\Event\EventAwareInterface;
+use Kaecyra\AppCommon\Event\EventAwareTrait;
 
 /**
  * Abstract Command
@@ -13,19 +15,27 @@ namespace Kaecyra\ChatBot\Bot\Command;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
+abstract class AbstractCommand implements CommandInterface, EventAwareInterface {
+
+    use EventAwareTrait;
 
     /**
-     * Command create time
+     * Expiry delta
+     * @var int
+     */
+    protected $expiry;
+
+    /**
+     * Create time
      * @var int
      */
     protected $createTime;
 
     /**
-     * Command supplemental data
-     * @var array
+     * Update time, when this command was last touched
+     * @var int
      */
-    protected $data;
+    protected $updateTime;
 
     /**
      * Execute method
@@ -34,21 +44,27 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
     protected $command;
 
     /**
-     * Expiry delta
-     * @var int
+     * Targets
+     * @var array
      */
-    protected $expiry;
+    protected $targets;
 
+    /**
+     * AbstractCommand constructor
+     *
+     */
     public function __construct() {
         $this->setCommand('');
         $this->createTime = time();
-        $this->expiry = 0;
-        $this->data = [];
+        $this->updateTime = time();
+        $this->expiry = 300;
+        $this->targets = [];
     }
 
     /**
      * Get method
      *
+     * @return string
      */
     public function getCommand(): string {
         return $this->command;
@@ -67,7 +83,7 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
 
     /**
      * Test whether we have a command
-     * 
+     *
      * @return bool
      */
     public function haveCommand(): bool {
@@ -75,92 +91,12 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
     }
 
     /**
-     * Get token/piece by index
+     * Touch the command
      *
-     * @param integer $index
-     * @return string|null
+     * Extends updateTime, delaying expiry.
      */
-    public function index($index) {
-        return $this->data['pieces'][$index] ?? null;
-    }
-
-    /**
-     * Get data by key
-     *
-     * @param string $key
-     */
-    public function &__get ($key) {
-        return $this->data[$key];
-    }
-
-    /**
-     * Assigns value by key
-     *
-     * @param string $key
-     * @param mixed $value value to set
-     */
-    public function __set($key, $value) {
-        $this->data[$key] = $value;
-    }
-
-    /**
-     * Whether or not data exists by key
-     *
-     * @param string $key to check for
-     * @return boolean
-     */
-    public function __isset($key) {
-        return isset($this->data[$key]);
-    }
-
-    /**
-     * Unset data by key
-     *
-     * @param string $key
-     */
-    public function __unset($key) {
-        unset($this->data[$key]);
-    }
-
-    /**
-     * Check if offset exists
-     *
-     * @param mixed $offset
-     */
-    public function offsetExists($offset) {
-        return isset($this->data[$offset]);
-    }
-
-    /**
-     * Set value on offset
-     *
-     * @param mixed $offset
-     * @param mixed $value
-     */
-    public function offsetSet($offset, $value) {
-        if (is_null($offset)) {
-            $this->data[] = $value;
-        } else {
-            $this->data[$offset] = $value;
-        }
-    }
-
-    /**
-     * Get offset value
-     *
-     * @param mixed $offset
-     */
-    public function offsetGet($offset) {
-        return isset($this->data[$offset]) ? $this->data[$offset] : null;
-    }
-
-    /**
-     * Unset offset
-     *
-     * @param mixed $offset
-     */
-    public function offsetUnset($offset) {
-        unset($this->data[$offset]);
+    public function touch() {
+        $this->updateTime = time();
     }
 
     /**
@@ -189,8 +125,40 @@ abstract class AbstractCommand implements CommandInterface, \ArrayAccess {
      * @return bool
      */
     public function isExpired(): bool {
-        return $this->expiry ? (($this->expiry + $this->createTime) < time()) : false;
+        return $this->expiry ? (($this->expiry + $this->updateTime) < time()) : false;
     }
 
+    /**
+     * Add a target
+     *
+     * @param string $name
+     * @param mixed $data
+     * @param boolean $multi optional. default false.
+     */
+    public function addTarget($name, $data, $multi = false) {
+        // Prepare the target
+        if ($multi) {
+            if (isset($this->targets[$name])) {
+                if (!is_array($this->targets[$name])) {
+                    $this->targets[$name] = [$this->targets[$name]];
+                }
+            } else {
+                $this->targets[$name] = [];
+            }
+            array_push($this->targets[$name], $data);
+        } else {
+            $this->targets[$name] = $data;
+        }
+    }
+
+    /**
+     * Test if we have a given target
+     *
+     * @param string $name
+     * @return boolean
+     */
+    public function haveTarget($name): bool {
+        return (isset($this->targets[$name]) && !empty($this->targets[$name]));
+    }
 
 }

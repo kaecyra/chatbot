@@ -20,4 +20,13 @@ class SimpleCommand extends AbstractCommand {
         $this->setCommand($method);
     }
 
+    /**
+     * Check if command is ready to run
+     *
+     * @return bool
+     */
+    public function isReady(): bool {
+        return true;
+    }
+
 }

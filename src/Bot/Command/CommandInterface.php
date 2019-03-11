@@ -21,4 +21,6 @@ interface CommandInterface {
 
     public function isExpired(): bool;
 
+    public function isReady(): bool;
+
 }
