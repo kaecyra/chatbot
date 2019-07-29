@@ -8,6 +8,7 @@
 namespace Kaecyra\ChatBot\Bot\Command;
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
+use Kaecyra\ChatBot\Client\Slack\Strategy\AbstractStrategy;
 
 /**
  * Abstract Command
@@ -48,6 +49,13 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
      * @var array
      */
     protected $targets;
+
+    /**
+     * TODO Refactor chatbot code where the strategy property was used dynamically before, we can then switch the visibility to protected
+     *
+     * @var AbstractStrategy
+     */
+    public $strategy;
 
     /**
      * AbstractCommand constructor
@@ -174,5 +182,23 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
         } else {
             throw new \Exception("Target {$name} doesn't exist");
         }
+    }
+
+    /**
+     * Set a command strategy
+     *
+     * @param AbstractStrategy $strategy
+     */
+    public function setStrategy(AbstractStrategy $strategy) {
+        $this->strategy = $strategy;
+    }
+
+    /**
+     * Get a command strategy
+     *
+     * @return AbstractStrategy
+     */
+    public function getStrategy(){
+        return $this->strategy;
     }
 }
