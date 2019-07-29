@@ -161,4 +161,18 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
         return (isset($this->targets[$name]) && !empty($this->targets[$name]));
     }
 
+    /**
+     * Get target
+     *
+     * @param string $name
+     * @return mixed
+     * @throws \Exception
+     */
+    public function getTarget(string $name) {
+        if ($this->haveTarget($name)) {
+            return $this->targets[$name];
+        } else {
+            throw new \Exception("Target {$name} doesn't exist");
+        }
+    }
 }
