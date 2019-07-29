@@ -52,4 +52,11 @@ class UserDestination {
         return $this->id;
     }
 
+    /**
+     * @return UserInterface
+     */
+    public function getUser(): UserInterface {
+        return $this->user;
+    }
+
 }
