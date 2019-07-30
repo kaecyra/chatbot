@@ -7,8 +7,6 @@
 
 namespace Kaecyra\ChatBot\Bot\Command;
 
-use Kaecyra\AppCommon\Event\EventAwareInterface;
-use Kaecyra\AppCommon\Event\EventAwareTrait;
 use Kaecyra\ChatBot\Bot\DestinationInterface;
 use Kaecyra\ChatBot\Bot\IO\TextParser\TextParser;
 use Kaecyra\ChatBot\Bot\User;
@@ -43,6 +41,11 @@ class InteractiveCommand extends AbstractCommand {
     protected $userDestination;
 
     /**
+     * @var $isReady
+     */
+    protected $isReady;
+
+    /**
      * InteractiveCommand constructor.
      *
      * @param UserDestination $ud
@@ -55,12 +58,17 @@ class InteractiveCommand extends AbstractCommand {
     }
 
     /**
-     * Check if command is ready to run
+     * Set/Check if command is ready to run
      *
+     * @param bool
      * @return bool
      */
-    public function isReady(): bool {
-        return true;
+    public function isReady($bool = null): bool {
+        if (isset($bool)) {
+            $this->isReady = $bool;
+        }
+
+        return $this->isReady;
     }
 
     /**
@@ -90,5 +98,4 @@ class InteractiveCommand extends AbstractCommand {
         // Parse text line within context of command
         $parser->analyzeFor($this);
     }
-
 }

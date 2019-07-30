@@ -8,6 +8,7 @@
 namespace Kaecyra\ChatBot\Bot\Command;
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
+use Kaecyra\ChatBot\Bot\Strategy\AbstractStrategy;
 
 /**
  * Abstract Command
@@ -48,6 +49,13 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
      * @var array
      */
     protected $targets;
+
+    /**
+     * TODO Refactor chatbot code where the strategy property was used dynamically before, we can then switch the visibility to protected
+     *
+     * @var AbstractStrategy
+     */
+    public $strategy;
 
     /**
      * AbstractCommand constructor
@@ -161,4 +169,36 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
         return (isset($this->targets[$name]) && !empty($this->targets[$name]));
     }
 
+    /**
+     * Get target
+     *
+     * @param string $name
+     * @return mixed
+     * @throws \Exception
+     */
+    public function getTarget(string $name) {
+        if ($this->haveTarget($name)) {
+            return $this->targets[$name];
+        } else {
+            throw new \Exception("Target {$name} doesn't exist");
+        }
+    }
+
+    /**
+     * Set a command strategy
+     *
+     * @param AbstractStrategy $strategy
+     */
+    public function setStrategy(AbstractStrategy $strategy) {
+        $this->strategy = $strategy;
+    }
+
+    /**
+     * Get a command strategy
+     *
+     * @return AbstractStrategy
+     */
+    public function getStrategy(){
+        return $this->strategy;
+    }
 }

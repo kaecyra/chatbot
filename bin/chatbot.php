@@ -21,8 +21,9 @@ chdir(dirname($argv[0]));
 // Include the core autoloader.
 
 $paths = [
+    getcwd().'/vendor/autoload.php',
     __DIR__.'/../vendor/autoload.php',  // locally
-    __DIR__.'/../../../autoload.php'    // dependency
+    __DIR__.'/../../../autoload.php',   // dependency
 ];
 foreach ($paths as $path) {
     if (file_exists($path)) {

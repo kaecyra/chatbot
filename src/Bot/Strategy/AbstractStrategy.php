@@ -5,7 +5,7 @@
  * @copyright 2016-2017 Tim Gunter
  */
 
-namespace Kaecyra\ChatBot\Client\Slack\Strategy;
+namespace Kaecyra\ChatBot\Bot\Strategy;
 
 use \Exception;
 

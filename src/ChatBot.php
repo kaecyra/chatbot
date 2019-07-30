@@ -35,6 +35,8 @@ use Kaecyra\AppCommon\Addon\AddonManager;
 use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
 Use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 
+use Kaecyra\ChatBot\Utility\CacheInterface;
+use Kaecyra\ChatBot\Utility\PoormansCache;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
@@ -168,7 +170,15 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
                 $daemonConfig,
                 new Reference([AbstractConfig::class, 'daemon'])
             ])
-            ->addCall('configure', [new Reference([AbstractConfig::class, "daemon"])]);
+            ->addCall('configure', [new Reference([AbstractConfig::class, "daemon"])])
+
+            ->rule(InteractiveCommand::class)
+            ->setShared(false)
+
+            ->rule(CacheInterface::class)
+            ->setClass(PoormansCache::class)
+            ->setShared(true)
+        ;
 
         // Set up loggers
 
