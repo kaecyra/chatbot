@@ -8,6 +8,7 @@
 namespace Kaecyra\ChatBot\Client\Slack\Strategy;
 
 use \Exception;
+use Kaecyra\ChatBot\Bot\Strategy\AbstractStrategy;
 
 /**
  * Startup sync strategy

@@ -7,7 +7,7 @@
 
 namespace Kaecyra\ChatBot\Client\Slack\Strategy\Message;
 
-use Kaecyra\ChatBot\Client\Slack\Strategy\AbstractStrategy;
+use Kaecyra\ChatBot\Bot\Strategy\AbstractStrategy;
 
 /**
  * Send user message strategy

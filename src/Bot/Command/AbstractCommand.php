@@ -8,7 +8,7 @@
 namespace Kaecyra\ChatBot\Bot\Command;
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
-use Kaecyra\ChatBot\Client\Slack\Strategy\AbstractStrategy;
+use Kaecyra\ChatBot\Bot\Strategy\AbstractStrategy;
 
 /**
  * Abstract Command
