@@ -59,6 +59,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
         ]);
 
         $this->setDefaultHeader('Accept', 'application/json');
+        $this->setDefaultHeader('Authorization', "Bearer {$this->token}");
     }
 
     /**
@@ -72,7 +73,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      */
     public function get($uri, array $query = array(), array $headers = array(), $options = array()) {
         try {
-            $query['token'] = $this->token;
+            $this->tLog(LogLevel::DEBUG, "GET {$uri}");
             $r = parent::get($uri, $query, $headers, $options);
         } catch (\Exception $ex) {
             throw $ex;
@@ -101,7 +102,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      */
     public function post($uri, $body = array(), array $headers = array(), $options = array()) {
         try {
-            $body['token'] = $this->token;
+            $this->tLog(LogLevel::DEBUG, "POST {$uri}");
             $r = parent::post($uri, $body, $headers, $options);
         } catch (\Exception $ex) {
             throw $ex;
@@ -131,7 +132,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
     }
 
     /**
-     * Get all channels
+     * Get all workspace channels
      *
      * @param bool $archived optional. include archived channels. default false.
      * @return array
@@ -143,24 +144,20 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
             'types' => 'public_channel,private_channel',
             'exclude_archived' => !$archived ? 'true' : 'false'
         ];
-        $next_cursor = "";
+        $cursor = "";
 
         do {
-            $more = false;
-            $response = $this->get('/conversations.list', array_merge($parameters, [
-                'cursor' => $next_cursor
-            ]));
+            $response = $this->get('/conversations.list', $parameters + [
+                'cursor' => $cursor
+            ]);
 
             $page = $response->getBody();
             $channels = $page['channels'] ?? [];
 
-            $conversations += $channels;
+            $conversations = array_merge($conversations, $channels);
 
-            $next_cursor = $page['response_metadata']['next_cursor'] ?? "";
-            if ($next_cursor) {
-                $more = true;
-            }
-        } while ($more);
+            $cursor = $page['response_metadata']['next_cursor'] ?? "";
+        } while (strlen($cursor));
 
         return $conversations;
     }
