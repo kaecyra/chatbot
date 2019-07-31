@@ -59,6 +59,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
         ]);
 
         $this->setDefaultHeader('Accept', 'application/json');
+        $this->setDefaultHeader('Authorization', "Bearer {$this->token}");
     }
 
     /**
@@ -72,7 +73,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      */
     public function get($uri, array $query = array(), array $headers = array(), $options = array()) {
         try {
-            $query['token'] = $this->token;
+            $this->tLog(LogLevel::DEBUG, "GET {$uri}");
             $r = parent::get($uri, $query, $headers, $options);
         } catch (\Exception $ex) {
             throw $ex;
@@ -101,7 +102,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      */
     public function post($uri, $body = array(), array $headers = array(), $options = array()) {
         try {
-            $body['token'] = $this->token;
+            $this->tLog(LogLevel::DEBUG, "POST {$uri}");
             $r = parent::post($uri, $body, $headers, $options);
         } catch (\Exception $ex) {
             throw $ex;
@@ -131,30 +132,34 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
     }
 
     /**
-     * Get all channels
+     * Get all workspace channels
      *
      * @param bool $archived optional. include archived channels. default false.
-     * @return HttpResponse
+     * @return array
      */
-    public function conversations_list(bool $archived = false): HttpResponse {
-        return $this->get('/conversations.list', [
+    public function conversations_list(bool $archived = false): array {
+        $conversations = [];
+
+        $parameters = [
             'types' => 'public_channel,private_channel',
             'exclude_archived' => !$archived ? 'true' : 'false'
-        ]);
-    }
+        ];
+        $cursor = "";
 
-    /**
-     * Get public channels
-     *
-     * @param bool $archived optional. include archived channels. default false.
-     * @param bool $members optional. include member lists. default false.
-     * @return HttpResponse
-     */
-    public function channels_list(bool $archived = false, bool $members = false): HttpResponse {
-        return $this->get('/channels.list', [
-            'exclude_archived' => !$archived ? 'true' : 'false',
-            'exclude_members' => !$members ? 'true' : 'false'
-        ]);
+        do {
+            $response = $this->get('/conversations.list', $parameters + [
+                'cursor' => $cursor
+            ]);
+
+            $page = $response->getBody();
+            $channels = $page['channels'] ?? [];
+
+            $conversations = array_merge($conversations, $channels);
+
+            $cursor = $page['response_metadata']['next_cursor'] ?? "";
+        } while (strlen($cursor));
+
+        return $conversations;
     }
 
     /**
