@@ -134,27 +134,35 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      * Get all channels
      *
      * @param bool $archived optional. include archived channels. default false.
-     * @return HttpResponse
+     * @return array
      */
     public function conversations_list(bool $archived = false): HttpResponse {
-        return $this->get('/conversations.list', [
+        $conversations = [];
+
+        $parameters = [
             'types' => 'public_channel,private_channel',
             'exclude_archived' => !$archived ? 'true' : 'false'
-        ]);
-    }
+        ];
+        $next_cursor = "";
 
-    /**
-     * Get public channels
-     *
-     * @param bool $archived optional. include archived channels. default false.
-     * @param bool $members optional. include member lists. default false.
-     * @return HttpResponse
-     */
-    public function channels_list(bool $archived = false, bool $members = false): HttpResponse {
-        return $this->get('/channels.list', [
-            'exclude_archived' => !$archived ? 'true' : 'false',
-            'exclude_members' => !$members ? 'true' : 'false'
-        ]);
+        do {
+            $more = false;
+            $response = $this->get('/conversations.list', array_merge($parameters, [
+                'cursor' => $next_cursor
+            ]));
+
+            $page = $response->getBody();
+            $channels = $page['channels'] ?? [];
+
+            $conversations += $channels;
+
+            $next_cursor = $page['response_metadata']['next_cursor'] ?? "";
+            if ($next_cursor) {
+                $more = true;
+            }
+        } while ($more);
+
+        return $conversations;
     }
 
     /**

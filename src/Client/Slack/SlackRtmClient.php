@@ -420,7 +420,7 @@ class SlackRtmClient extends SocketClient {
                 // Get public and private channels
 
                 $this->tLog(LogLevel::INFO, " Indexing channels");
-                $conversations = $this->web->conversations_list(false)->getBody()['channels'] ?? [];
+                $conversations = $this->web->conversations_list(false);
                 foreach ($conversations as $channel) {
                     $this->tLog(LogLevel::INFO, " Channel: {id} ({name})", [
                         'id' => $channel['id'],
@@ -430,23 +430,6 @@ class SlackRtmClient extends SocketClient {
                     $this->ingestRoom($roster, $channel);
                 }
 
-//                $scopes = [
-//                    'public' => $this->web->channels_list(false, true)->getBody()['channels'] ?? [],
-//                    'private' => $this->web->groups_list(false)->getBody()['groups'] ?? []
-//                ];
-//                foreach ($scopes as $scope => $channels) {
-//                    $this->tLog(LogLevel::INFO, " Indexing {scope} channels", [
-//                        'scope' => $scope
-//                    ]);
-//                    foreach ($channels as $channel) {
-//                        $this->tLog(LogLevel::INFO, " Channel: {id} ({name})", [
-//                            'id' => $channel['id'],
-//                            'name' => $channel['name']
-//                        ]);
-//
-//                        $this->ingestRoom($roster, $channel);
-//                    }
-//                }
                 break;
 
             case 'join':
