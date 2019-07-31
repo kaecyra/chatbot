@@ -6,6 +6,7 @@
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 
 use Kaecyra\ChatBot\Socket\MessageInterface;
@@ -33,6 +34,7 @@ class Messages extends AbstractProtocolHandler {
      */
     public function start(SlackRtmClient $client) {
         $client->addMessageHandler('message', [$this, 'message_message']);
+        $client->addMessageHandler('user_typing', [$this, 'message_user_typing']);
     }
 
     /**
@@ -78,4 +80,47 @@ class Messages extends AbstractProtocolHandler {
         }
     }
 
+    /**
+     * Receives user_typing messages
+     *
+     * @param Persona $persona
+     * @param Roster $roster
+     * @param BotUser $bot
+     * @param MessageInterface $message
+     */
+    public function message_user_typing(Persona $persona, Roster $roster, BotUser $bot, MessageInterface $message) {
+        $userObject = $roster->getUser('id', $message->get('user'));
+
+        $channelID = $message->get('channel');
+        if ($userObject->getID() == $bot->getID()) {
+            return;
+        }
+
+        $messageType = substr($channelID, 0, 1);
+        switch ($messageType) {
+            case 'C':
+            case 'G':
+                // Channel message
+                $conversationObject = $roster->getRoom('id', $channelID);
+                break;
+
+            case 'D':
+                // Direct message
+                // Ingest conversation if missing
+                try {
+                    $conversationObject = $roster->getConversation('id', $channelID);
+                } catch (MapNotFoundException $ex) {
+                    $conversationObject = new Conversation($channelID, $userObject);
+                    $roster->map($conversationObject);
+                }
+                break;
+        }
+
+        // Fire "userTyping" event
+        $this->fire('userTyping', [
+            $conversationObject,
+            $userObject,
+            $message
+        ]);
+    }
 }
