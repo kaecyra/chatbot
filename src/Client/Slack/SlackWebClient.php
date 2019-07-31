@@ -136,7 +136,7 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
      * @param bool $archived optional. include archived channels. default false.
      * @return array
      */
-    public function conversations_list(bool $archived = false): HttpResponse {
+    public function conversations_list(bool $archived = false): array {
         $conversations = [];
 
         $parameters = [
