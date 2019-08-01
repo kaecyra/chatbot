@@ -186,7 +186,7 @@ class Channels extends AbstractProtocolHandler {
             'reason' => $reason
         ]);
 
-        $persona->onLeave($room, $user);
+        $persona->onJoin($room, $user);
     }
 
     /**
@@ -208,7 +208,7 @@ class Channels extends AbstractProtocolHandler {
             'cid' => $room->getID()
         ]);
 
-        $persona->onJoin($room, $user);
+        $persona->onLeave($room, $user);
     }
 
     /**
