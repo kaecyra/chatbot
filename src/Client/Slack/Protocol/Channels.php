@@ -35,7 +35,6 @@ class Channels extends AbstractProtocolHandler {
      * @param SlackRtmClient $client
      */
     public function start(SlackRtmClient $client) {
-        $client->addMessageHandler('channel_joined', [$this, 'message_channel_joined']);
         $client->addMessageHandler('channel_left', [$this, 'message_channel_left']);
 
         $client->addMessageHandler('member_joined_channel', [$this, 'message_member_joined_channel']);
@@ -55,9 +54,11 @@ class Channels extends AbstractProtocolHandler {
      * @param array $room
      */
     protected function ingestRoom(Roster $roster, $room) {
-        $roomObject = new Room($room['id'], $room['name']);
-        $roomObject->setTopic($room['purpose']['value'] ?? "");
-        $roomObject->setData($room);
+        //$roomObject = new Room($room['id'], $room['name']);
+        //$roomObject->setTopic($room['purpose']['value'] ?? "");
+        //$roomObject->setData($room);
+
+        $roomObject = $roster->getRoom('id', $room);
 
         if (isset($room['members']) && is_array($room['members'])) {
             foreach ($room['members'] as $member) {
@@ -72,26 +73,6 @@ class Channels extends AbstractProtocolHandler {
         }
 
         $roster->map($roomObject);
-    }
-
-    /**
-     * Handle bot joins
-     *
-     * @param Roster $roster
-     * @param BotUser $user
-     * @param MessageInterface $message
-     */
-    public function message_channel_joined(Persona $persona, Roster $roster, BotUser $user, MessageInterface $message) {
-        $this->ingestRoom($roster, $message->get('channel'));
-        try {
-            $roomObject = $roster->getRoom('id', $message->get('channel.id'));
-        } catch (MapNotFoundException $ex) {
-            $this->tLog(LogLevel::WARNING, "Could not process channel self join event. {reason}", [
-                'reason' => $ex->getMessage()
-            ]);
-            return;
-        }
-        $this->channelJoin($persona, $roomObject, $user);
     }
 
     /**
@@ -115,7 +96,7 @@ class Channels extends AbstractProtocolHandler {
     }
 
     /**
-     * Handle joins
+     * Handle joins (for both user and bot)
      *
      * @param Roster $roster
      * @param MessageInterface $message
