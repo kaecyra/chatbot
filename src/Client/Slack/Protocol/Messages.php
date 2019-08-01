@@ -97,21 +97,30 @@ class Messages extends AbstractProtocolHandler {
         }
 
         $messageType = substr($channelID, 0, 1);
-        if ($messageType === 'D') {
-            // Direct message
-            // Ingest conversation if missing
-            try {
-                $conversationObject = $roster->getConversation('id', $channelID);
-            } catch (MapNotFoundException $ex) {
-                $conversationObject = new Conversation($channelID, $userObject);
-                $roster->map($conversationObject);
-            }
-            // Fire "userTyping" event
-            $this->fire('userTyping', [
-                $conversationObject,
-                $userObject,
-                $message
-            ]);
+        switch ($messageType) {
+            case 'C':
+            case 'G':
+                // Channel message
+                $conversationObject = $roster->getRoom('id', $channelID);
+                break;
+
+            case 'D':
+                // Direct message
+                // Ingest conversation if missing
+                try {
+                    $conversationObject = $roster->getConversation('id', $channelID);
+                } catch (MapNotFoundException $ex) {
+                    $conversationObject = new Conversation($channelID, $userObject);
+                    $roster->map($conversationObject);
+                }
+                break;
         }
+
+        // Fire "userTyping" event
+        $this->fire('userTyping', [
+            $conversationObject,
+            $userObject,
+            $message
+        ]);
     }
 }
