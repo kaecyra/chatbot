@@ -52,16 +52,12 @@ class Channels extends AbstractProtocolHandler {
      * Ingest and map a room
      *
      * @param Roster $roster
-     * @param array|string $room array representing the room or string being the roomID
+     * @param array $room
      */
     protected function ingestRoom(Roster $roster, $room) {
-        if (is_array($room)) {
-            $roomObject = new Room($room['id'], $room['name']);
-            $roomObject->setTopic($room['purpose']['value'] ?? "");
-            $roomObject->setData($room);
-        } else {
-            $roomObject = $roster->getRoom('id', $room);
-        }
+        $roomObject = new Room($room['id'], $room['name']);
+        $roomObject->setTopic($room['purpose']['value'] ?? "");
+        $roomObject->setData($room);
 
         if (isset($room['members']) && is_array($room['members'])) {
             foreach ($room['members'] as $member) {
