@@ -8,6 +8,8 @@
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 
+use Kaecyra\ChatBot\Client\Slack\WebClientAwareInterface;
+use Kaecyra\ChatBot\Client\Slack\WebClientAwareTrait;
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
 use Kaecyra\ChatBot\Bot\Persona;
@@ -20,21 +22,22 @@ use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
 
 use Psr\Log\LogLevel;
 
-use \Exception;
-
 /**
  * Channels protocol handler
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class Channels extends AbstractProtocolHandler {
+class Channels extends AbstractProtocolHandler Implements WebClientAwareInterface {
+
+    use WebClientAwareTrait;
 
     /**
      *
      * @param SlackRtmClient $client
      */
     public function start(SlackRtmClient $client) {
+
         $client->addMessageHandler('channel_left', [$this, 'message_channel_left']);
 
         $client->addMessageHandler('member_joined_channel', [$this, 'message_member_joined_channel']);
@@ -51,15 +54,19 @@ class Channels extends AbstractProtocolHandler {
      * Ingest and map a room
      *
      * @param Roster $roster
-     * @param array $room
+     * @param string $room
+     * @throws
      */
     protected function ingestRoom(Roster $roster, $room) {
-        //$roomObject = new Room($room['id'], $room['name']);
-        //$roomObject->setTopic($room['purpose']['value'] ?? "");
-        //$roomObject->setData($room);
-
-        $roomObject = $roster->getRoom('id', $room);
-
+        try {
+            $roomObject = $roster->getRoom('id', $room);
+        } catch (MapNotFoundException $ex) {
+            $webClient = $this->getWebClient();
+            $room = $webClient->conversations_info($room);
+            $roomObject = new Room($room['id'], $room['name']);
+            $roomObject->setTopic($room['purpose']['value'] ?? "");
+            $roomObject->setData($room);
+        }
         if (isset($room['members']) && is_array($room['members'])) {
             foreach ($room['members'] as $member) {
                 $mid = $member['id'];
