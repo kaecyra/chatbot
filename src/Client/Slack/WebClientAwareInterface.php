@@ -7,6 +7,8 @@ namespace Kaecyra\ChatBot\Client\Slack;
  * @package Kaecyra\ChatBot\Client\Slack
  */
 interface WebClientAwareInterface {
-    function getWebClient(): SlackWebClient;
-    function setWebClient(SlackWebClient $webClient);
+
+    public function getWebClient(): SlackWebClient;
+
+    public function setWebClient(SlackWebClient $webClient);
 }
