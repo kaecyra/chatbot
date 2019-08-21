@@ -330,38 +330,31 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
         ]);
 
         $botUserObject = $this->container->get(BotUser::class);
-        $botNames = [
-            strtolower($botUserObject->getReal()),
-            strtolower($botUserObject->getName())
-        ];
+        $botUserMentionTag = "<@{$botUserObject->getID()}>";
+        $body = $message;
 
-        foreach ($botNames as $botName) {
+        // If our name is in the message, look for it at either end
+        if (stristr($body, $botUserMentionTag)) {
+            $command = null;
 
-            $body = $message;
+            $matchedNick = false;
 
-            // If our name is in the message, look for it at either end
-            if (stristr($body, $botName)) {
-                $command = null;
+            // Left side check
+            $matches = 0;
+            $body = preg_replace("/^({$botUserMentionTag}[, ])/i", '', $body, -1, $matches);
+            $matchedNick = $matchedNick || $matches > 0;
+            // Right side check
+            $body = preg_replace("/([, ]{$botUserMentionTag})\??$/i", '', $body, -1, $matches);
+            $matchedNick = $matchedNick || $matches > 0;
 
-                $matchedNick = false;
+            $command = $body;
 
-                // Left side exclude
-                $matches = 0;
-                $body = preg_replace("/^(@?(?:{$botName}),? ?)/i", '', $body, -1, $matches);
-                $matchedNick = $matchedNick || $matches > 0;
-                $body = preg_replace("/(,? ?@?(?:{$botName})\??)$/i", '', $body, -1, $matches);
-                $matchedNick = $matchedNick || $matches > 0;
-
-                $command = $body;
-
-                // If this was directed at us, parse for commands
-                if (!is_null($command) && $matchedNick) {
-                    $this->onDirectedMessage($roomObject, $userObject, $command);
-                    break;
-                }
+            // If this was directed at us, parse for commands
+            if (!is_null($command) && $matchedNick) {
+                $this->onDirectedMessage($roomObject, $userObject, $command);
             }
-
         }
+
     }
 
     /**
