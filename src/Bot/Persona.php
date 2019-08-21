@@ -334,7 +334,7 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
         $body = $message;
 
         // If our name is in the message, look for it at either end
-        if (stristr($body, $botUserMentionTag)) {
+        if (stripos($body, $botUserMentionTag) !== false) {
             $command = null;
 
             $matchedNick = false;
