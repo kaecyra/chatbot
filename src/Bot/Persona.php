@@ -339,14 +339,10 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
 
             $matchedNick = false;
 
-            // Left side check
+            // Remove the bot user tag and useless chars from the command
             $matches = 0;
-            $body = preg_replace("/^({$botUserMentionTag}[, ])/i", '', $body, -1, $matches);
+            $body = preg_replace("/((?:^| ){$botUserMentionTag}\.?,?\??)/i", '', $body, -1, $matches);
             $matchedNick = $matchedNick || $matches > 0;
-            // Right side check
-            $body = preg_replace("/([, ]{$botUserMentionTag})\??$/i", '', $body, -1, $matches);
-            $matchedNick = $matchedNick || $matches > 0;
-
             $command = $body;
 
             // If this was directed at us, parse for commands
