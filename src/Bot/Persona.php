@@ -368,54 +368,57 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             'text' => $message
         ]);
 
-        // Prepare text parser
-        $parser = new TextParser($message);
+        $messageLines = explode("\n", $message);
+        foreach ($messageLines as $messageLine) {
+            // Prepare text parser
+            $parser = new TextParser($messageLine);
 
-        // Generate UserDestination tag
-        $ud = new UserDestination($userObject, $destinationObject);
+            // Generate UserDestination tag
+            $ud = new UserDestination($userObject, $destinationObject);
 
-        // Lookup or create command
-        if ($this->havePendingCommand($ud)) {
-            $command = $this->getPendingCommand($ud);
-        } else {
-            // Parse command string into state
-            $command = $this->container->getArgs(InteractiveCommand::class, [$ud]);
-            $command->addTarget('destination', $destinationObject);
-            $command->addTarget('user', $userObject);
-        }
+            // Lookup or create command
+            if ($this->havePendingCommand($ud)) {
+                $command = $this->getPendingCommand($ud);
+            } else {
+                // Parse command string into state
+                $command = $this->container->getArgs(InteractiveCommand::class, [$ud]);
+                $command->addTarget('destination', $destinationObject);
+                $command->addTarget('user', $userObject);
+            }
 
-        $command->ingestMessage($parser);
+            $command->ingestMessage($parser);
 
-        if (!$command->getCommand()) {
-            $this->router->route($command);
-        }
+            if (!$command->getCommand()) {
+                $this->router->route($command);
+            }
 
-        // If no method was detected, bail out
-        if (!$command->getCommand()) {
+            // If no method was detected, bail out
+            if (!$command->getCommand()) {
 
-            // Allow hooks for individual message
-            $this->fire('directedMessage', [
-                $destinationObject,
-                $userObject,
-                $parser
-            ]);
+                // Allow hooks for individual message
+                $this->fire('directedMessage', [
+                    $destinationObject,
+                    $userObject,
+                    $parser
+                ]);
 
-            return;
-        }
+                continue;
+            }
 
-        if (!$command->isReady()) {
-            $this->tLog(LogLevel::NOTICE, "Gather Schema: {command}", [
-                'command' => $command->getCommand()
-            ]);
+            if (!$command->isReady()) {
+                $this->tLog(LogLevel::NOTICE, "Gather Schema: {command}", [
+                    'command' => $command->getCommand()
+                ]);
 
-            $this->gatherSchema($command);
-        } else {
-            $this->tLog(LogLevel::NOTICE, "Command: {command}", [
-                'command' => $command->getCommand()
-            ]);
+                $this->gatherSchema($command);
+            } else {
+                $this->tLog(LogLevel::NOTICE, "Command: {command}", [
+                    'command' => $command->getCommand()
+                ]);
 
-            // Execute command
-            $this->runCommand($command);
+                // Execute command
+                $this->runCommand($command);
+            }
         }
     }
 
