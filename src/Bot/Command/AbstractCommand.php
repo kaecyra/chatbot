@@ -65,7 +65,7 @@ abstract class AbstractCommand implements CommandInterface, EventAwareInterface 
         $this->setCommand('');
         $this->createTime = time();
         $this->updateTime = time();
-        $this->expiry = 300;
+        $this->expiry = 600;
         $this->targets = [];
     }
 
