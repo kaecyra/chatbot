@@ -333,20 +333,16 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
         $botUserMentionTag = "<@{$botUserObject->getID()}>";
         $body = $message;
 
-        // If our name is in the message, look for it at either end
+        // Look for the bot @mention tag anywhere in the command
         if (stripos($body, $botUserMentionTag) !== false) {
             $command = null;
 
-            $matchedNick = false;
-
             // Remove the bot user tag and useless chars from the command
-            $matches = 0;
-            $body = preg_replace("/((?:^| ){$botUserMentionTag}\.?,?\??)/i", '', $body, -1, $matches);
-            $matchedNick = $matchedNick || $matches > 0;
+            $body = preg_replace("/((?:^| ){$botUserMentionTag}\.?,?\??)/i", '', $body, -1);
             $command = $body;
 
             // If this was directed at us, parse for commands
-            if (!is_null($command) && $matchedNick) {
+            if (!is_null($command)) {
                 $this->onDirectedMessage($roomObject, $userObject, $command);
             }
         }
