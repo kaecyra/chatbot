@@ -28,7 +28,7 @@ use Psr\Log\LogLevel;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class Channels extends AbstractProtocolHandler Implements WebClientAwareInterface {
+class Channels extends AbstractProtocolHandler implements WebClientAwareInterface {
 
     use WebClientAwareTrait;
 
