@@ -8,6 +8,7 @@
 namespace Kaecyra\ChatBot;
 
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
+use Kaecyra\ChatBot\Client\Slack\WebClientAwareInterface;
 use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
 use Kaecyra\ChatBot\Client\ClientInterface;
@@ -158,6 +159,9 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
 
             ->rule(EventAwareInterface::class)
             ->addCall('setEventManager')
+
+            ->rule(WebClientAwareInterface::class)
+            ->addCall('setWebClient')
 
             ->rule(TaggedLogInterface::class)
             ->addCall('setDefaultLogCallback')

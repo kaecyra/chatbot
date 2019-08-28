@@ -330,38 +330,23 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
         ]);
 
         $botUserObject = $this->container->get(BotUser::class);
-        $botNames = [
-            strtolower($botUserObject->getReal()),
-            strtolower($botUserObject->getName())
-        ];
+        $botUserMentionTag = "<@{$botUserObject->getID()}>";
+        $body = $message;
 
-        foreach ($botNames as $botName) {
+        // Look for the bot @mention tag anywhere in the command
+        if (stripos($body, $botUserMentionTag) !== false) {
+            $command = null;
 
-            $body = $message;
+            // Remove the bot user tag and useless chars from the command
+            $body = preg_replace("/((?:^| ){$botUserMentionTag}\.?,?\??)/i", '', $body, -1);
+            $command = $body;
 
-            // If our name is in the message, look for it at either end
-            if (stristr($body, $botName)) {
-                $command = null;
-
-                $matchedNick = false;
-
-                // Left side exclude
-                $matches = 0;
-                $body = preg_replace("/^(@?(?:{$botName}),? ?)/i", '', $body, -1, $matches);
-                $matchedNick = $matchedNick || $matches > 0;
-                $body = preg_replace("/(,? ?@?(?:{$botName})\??)$/i", '', $body, -1, $matches);
-                $matchedNick = $matchedNick || $matches > 0;
-
-                $command = $body;
-
-                // If this was directed at us, parse for commands
-                if (!is_null($command) && $matchedNick) {
-                    $this->onDirectedMessage($roomObject, $userObject, $command);
-                    break;
-                }
+            // If this was directed at us, parse for commands
+            if (!is_null($command)) {
+                $this->onDirectedMessage($roomObject, $userObject, $command);
             }
-
         }
+
     }
 
     /**
@@ -379,54 +364,57 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             'text' => $message
         ]);
 
-        // Prepare text parser
-        $parser = new TextParser($message);
+        $messageLines = explode("\n", $message);
+        foreach ($messageLines as $messageLine) {
+            // Prepare text parser
+            $parser = new TextParser($messageLine);
 
-        // Generate UserDestination tag
-        $ud = new UserDestination($userObject, $destinationObject);
+            // Generate UserDestination tag
+            $ud = new UserDestination($userObject, $destinationObject);
 
-        // Lookup or create command
-        if ($this->havePendingCommand($ud)) {
-            $command = $this->getPendingCommand($ud);
-        } else {
-            // Parse command string into state
-            $command = $this->container->getArgs(InteractiveCommand::class, [$ud]);
-            $command->addTarget('destination', $destinationObject);
-            $command->addTarget('user', $userObject);
-        }
+            // Lookup or create command
+            if ($this->havePendingCommand($ud)) {
+                $command = $this->getPendingCommand($ud);
+            } else {
+                // Parse command string into state
+                $command = $this->container->getArgs(InteractiveCommand::class, [$ud]);
+                $command->addTarget('destination', $destinationObject);
+                $command->addTarget('user', $userObject);
+            }
 
-        $command->ingestMessage($parser);
+            $command->ingestMessage($parser);
 
-        if (!$command->getCommand()) {
-            $this->router->route($command);
-        }
+            if (!$command->getCommand()) {
+                $this->router->route($command);
+            }
 
-        // If no method was detected, bail out
-        if (!$command->getCommand()) {
+            // If no method was detected, bail out
+            if (!$command->getCommand()) {
 
-            // Allow hooks for individual message
-            $this->fire('directedMessage', [
-                $destinationObject,
-                $userObject,
-                $parser
-            ]);
+                // Allow hooks for individual message
+                $this->fire('directedMessage', [
+                    $destinationObject,
+                    $userObject,
+                    $parser
+                ]);
 
-            return;
-        }
+                continue;
+            }
 
-        if (!$command->isReady()) {
-            $this->tLog(LogLevel::NOTICE, "Gather Schema: {command}", [
-                'command' => $command->getCommand()
-            ]);
+            if (!$command->isReady()) {
+                $this->tLog(LogLevel::NOTICE, "Gather Schema: {command}", [
+                    'command' => $command->getCommand()
+                ]);
 
-            $this->gatherSchema($command);
-        } else {
-            $this->tLog(LogLevel::NOTICE, "Command: {command}", [
-                'command' => $command->getCommand()
-            ]);
+                $this->gatherSchema($command);
+            } else {
+                $this->tLog(LogLevel::NOTICE, "Command: {command}", [
+                    'command' => $command->getCommand()
+                ]);
 
-            // Execute command
-            $this->runCommand($command);
+                // Execute command
+                $this->runCommand($command);
+            }
         }
     }
 

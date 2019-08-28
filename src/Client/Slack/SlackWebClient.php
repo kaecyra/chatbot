@@ -163,6 +163,18 @@ class SlackWebClient extends HttpClient implements LoggerAwareInterface, TaggedL
     }
 
     /**
+     * Get a channel by channel ID
+     *
+     * @param string $channel
+     * @return mixed
+     * @throws Exception
+     */
+    public function conversations_info(string $channel) {
+        $response = $this->get('/conversations.info', ['channel' => $channel]);
+        return $response->getBody()['channel'];
+    }
+
+    /**
      * Get channel info
      *
      * @param string $channel

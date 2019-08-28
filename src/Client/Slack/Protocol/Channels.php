@@ -8,6 +8,8 @@
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 
+use Kaecyra\ChatBot\Client\Slack\WebClientAwareInterface;
+use Kaecyra\ChatBot\Client\Slack\WebClientAwareTrait;
 use Kaecyra\ChatBot\Socket\MessageInterface;
 
 use Kaecyra\ChatBot\Bot\Persona;
@@ -20,22 +22,22 @@ use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
 
 use Psr\Log\LogLevel;
 
-use \Exception;
-
 /**
  * Channels protocol handler
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class Channels extends AbstractProtocolHandler {
+class Channels extends AbstractProtocolHandler implements WebClientAwareInterface {
+
+    use WebClientAwareTrait;
 
     /**
      *
      * @param SlackRtmClient $client
      */
     public function start(SlackRtmClient $client) {
-        $client->addMessageHandler('channel_joined', [$this, 'message_channel_joined']);
+
         $client->addMessageHandler('channel_left', [$this, 'message_channel_left']);
 
         $client->addMessageHandler('member_joined_channel', [$this, 'message_member_joined_channel']);
@@ -52,13 +54,19 @@ class Channels extends AbstractProtocolHandler {
      * Ingest and map a room
      *
      * @param Roster $roster
-     * @param array $room
+     * @param string $room
+     * @throws
      */
-    protected function ingestRoom(Roster $roster, array $room) {
-        $roomObject = new Room($room['id'], $room['name']);
-        $roomObject->setTopic($room['purpose']['value'] ?? "");
-        $roomObject->setData($room);
-
+    protected function ingestRoom(Roster $roster, $room) {
+        try {
+            $roomObject = $roster->getRoom('id', $room);
+        } catch (MapNotFoundException $ex) {
+            $webClient = $this->getWebClient();
+            $room = $webClient->conversations_info($room);
+            $roomObject = new Room($room['id'], $room['name']);
+            $roomObject->setTopic($room['purpose']['value'] ?? "");
+            $roomObject->setData($room);
+        }
         if (isset($room['members']) && is_array($room['members'])) {
             foreach ($room['members'] as $member) {
                 $mid = $member['id'];
@@ -72,26 +80,6 @@ class Channels extends AbstractProtocolHandler {
         }
 
         $roster->map($roomObject);
-    }
-
-    /**
-     * Handle bot joins
-     *
-     * @param Roster $roster
-     * @param BotUser $user
-     * @param MessageInterface $message
-     */
-    public function message_channel_joined(Persona $persona, Roster $roster, BotUser $user, MessageInterface $message) {
-        $this->ingestRoom($roster, $message->get('channel'));
-        try {
-            $roomObject = $roster->getRoom('id', $message->get('channel.id'));
-        } catch (MapNotFoundException $ex) {
-            $this->tLog(LogLevel::WARNING, "Could not process channel self join event. {reason}", [
-                'reason' => $ex->getMessage()
-            ]);
-            return;
-        }
-        $this->channelJoin($persona, $roomObject, $user);
     }
 
     /**
@@ -115,7 +103,7 @@ class Channels extends AbstractProtocolHandler {
     }
 
     /**
-     * Handle joins
+     * Handle joins (for both user and bot)
      *
      * @param Roster $roster
      * @param MessageInterface $message
@@ -182,7 +170,7 @@ class Channels extends AbstractProtocolHandler {
             'reason' => $reason
         ]);
 
-        $persona->onLeave($room, $user);
+        $persona->onJoin($room, $user);
     }
 
     /**
@@ -204,7 +192,7 @@ class Channels extends AbstractProtocolHandler {
             'cid' => $room->getID()
         ]);
 
-        $persona->onJoin($room, $user);
+        $persona->onLeave($room, $user);
     }
 
     /**
