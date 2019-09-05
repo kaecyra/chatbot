@@ -40,4 +40,5 @@ interface ClientInterface {
 
     public function onError($code = null, $reason = null);
 
+    public function emphasize(string $string): string;
 }

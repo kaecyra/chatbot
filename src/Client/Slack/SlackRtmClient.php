@@ -700,7 +700,7 @@ class SlackRtmClient extends SocketClient {
      * @param string $string
      * @return string
      */
-    public static function emphasize(string $string) {
+    public function emphasize(string $string): string {
         // Let's make that string bold
         return sprintf("*%s*", $string);
     }
