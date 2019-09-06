@@ -694,4 +694,15 @@ class SlackRtmClient extends SocketClient {
         $this->queueCommand($sendCommand);
     }
 
+    /**
+     * Emphasize a string
+     *
+     * @param string $string
+     * @return string
+     */
+    public function emphasize(string $string): string {
+        // Let's make that string bold
+        return sprintf("*%s*", $string);
+    }
+
 }
