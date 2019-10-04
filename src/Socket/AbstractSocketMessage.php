@@ -2,14 +2,12 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Socket;
 
 use Kaecyra\AppCommon\Store;
-
-use Kaecyra\ChatBot\Socket\MessageInterface;
 
 /**
  * Abstract socket message

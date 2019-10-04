@@ -2,7 +2,7 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot;
@@ -16,5 +16,18 @@ namespace Kaecyra\ChatBot\Bot;
 interface UserInterface {
 
     public function getID();
+
+    /**
+     * Set user name
+     * @param string $name
+     * @return UserInterface
+     */
+    public function setName(string $name): UserInterface;
+
+    /**
+     * Get user name
+     * @return string
+     */
+    public function getName(): string;
 
 }

@@ -2,50 +2,53 @@
 
 /**
  * @license MIT
- * @copyright 2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot;
 
+use Garden\Cli\Args;
+use Garden\Cli\Cli;
+use Garden\Container\Container;
+use Garden\Container\Reference;
+use Garden\Daemon\AppInterface;
+use Garden\Daemon\Daemon;
+use Garden\Daemon\ErrorHandler;
+use Kaecyra\AppCommon\AbstractConfig;
+use Kaecyra\AppCommon\Addon\AddonManager;
+use Kaecyra\AppCommon\ConfigCollection;
+use Kaecyra\AppCommon\ConfigInterface;
+use Kaecyra\AppCommon\Event\EventAwareInterface;
+use Kaecyra\AppCommon\Event\EventAwareTrait;
+use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
+use Kaecyra\ChatBot\Addon\PersonaAwareInterface;
+use Kaecyra\ChatBot\Bot\Command\AbstractCommand;
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
+use Kaecyra\ChatBot\Bot\Command\CommandRouter;
+use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
+use Kaecyra\ChatBot\Bot\IO\AbstractParser;
+use Kaecyra\ChatBot\Bot\IO\ParserInterface;
+use Kaecyra\ChatBot\Bot\IO\ParserResponse;
+use Kaecyra\ChatBot\Bot\IO\TypedToken\AbstractTypedToken;
+use Kaecyra\ChatBot\Bot\IO\TypedToken\TypedTokenInterface;
+use Kaecyra\ChatBot\Bot\Persona;
+use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Bot\Strategy\AbstractStrategy;
+use Kaecyra\ChatBot\Client\ClientInterface;
 use Kaecyra\ChatBot\Client\Slack\WebClientAwareInterface;
 use Kaecyra\ChatBot\Error\FatalErrorHandler;
 use Kaecyra\ChatBot\Error\LogErrorHandler;
-use Kaecyra\ChatBot\Client\ClientInterface;
-use Kaecyra\ChatBot\Client\AbstractClient;
 use Kaecyra\ChatBot\Utility\Cache;
-
-use Kaecyra\ChatBot\Bot\Persona;
-use Kaecyra\ChatBot\Bot\Roster;
-use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
-
-use Garden\Daemon\Daemon;
-use Garden\Daemon\AppInterface;
-use Garden\Daemon\ErrorHandler;
-use Garden\Container\Container;
-use Garden\Container\Reference;
-use Garden\Cli\Cli;
-use Garden\Cli\Args;
-
-use Kaecyra\AppCommon\AbstractConfig;
-use Kaecyra\AppCommon\ConfigInterface;
-use Kaecyra\AppCommon\ConfigCollection;
-use Kaecyra\AppCommon\Event\EventAwareInterface;
-use Kaecyra\AppCommon\Event\EventAwareTrait;
-use Kaecyra\AppCommon\Addon\AddonManager;
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-Use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
-
 use Kaecyra\ChatBot\Utility\CacheInterface;
 use Kaecyra\ChatBot\Utility\PoormansCache;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerAwareInterface;
-use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerAwareTrait;
+use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
-
-use React\EventLoop\LoopInterface;
 use React\EventLoop\Factory as EventLoopFactory;
+use React\EventLoop\LoopInterface;
 
 /**
  * Payload Context
@@ -226,7 +229,7 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
                 $clientType = $config->get('client.type');
                 $clientHandler = $config->get("client.{$clientType}.handler");
                 if (!$container->has($clientHandler)) {
-                    throw new Exception("Unknown client handler: {$clientHandler}");
+                    throw new \Exception("Unknown client handler: {$clientHandler}");
                 }
                 $clientSettings = $config->get("connect.{$clientType}");
                 $client = $container->getArgs($clientHandler, [
@@ -261,6 +264,19 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
             ->addCall('setTagFormat', ['rev-%d'])
             ->addCall('setKeyFormat', ['%s!%s']);
 
+        // Prepare persona
+
+        $personaHandler = $config->get("persona.handler");
+        if ($container->has($personaHandler)) {
+            $container
+                ->rule(Persona::class)
+                ->setClass($personaHandler);
+        }
+
+        $container
+            ->rule(PersonaAwareInterface::class)
+            ->addCall('setPersona');
+
         // Prepare bot objects
 
         $container
@@ -268,7 +284,26 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
             ->setShared(true);
 
         $container
-            ->rule(CommandInterface::class)
+            ->rule(AbstractCommand::class)
+            ->addAlias(CommandInterface::class)
+            ->setShared(false);
+
+        $container
+            ->rule(AbstractParser::class)
+            ->addAlias(ParserInterface::class)
+            ->setShared(false);
+
+        $container
+            ->rule(ParserResponse::class)
+            ->setShared(false);
+
+        $container
+            ->rule(AbstractStrategy::class)
+            ->setShared(false);
+
+        $container
+            ->rule(AbstractTypedToken::class)
+            ->addAlias(TypedTokenInterface::class)
             ->setShared(false);
     }
 
@@ -363,10 +398,9 @@ class ChatBot implements AppInterface, LoggerAwareInterface, EventAwareInterface
         
         $this->container->get(ClientInterface::class);
 
-        // Get persona
-        $persona = $this->container->get(Persona::class);
-        $persona->run();
-
+        // Get and run CommandRouter
+        $router = $this->container->get(CommandRouter::class);
+        $router->run();
     }
 
 }

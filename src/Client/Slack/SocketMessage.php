@@ -2,15 +2,14 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack;
 
+use Exception;
 use Kaecyra\ChatBot\Socket\AbstractSocketMessage;
 use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use \Exception;
 
 /**
  * Slack RTM socket message

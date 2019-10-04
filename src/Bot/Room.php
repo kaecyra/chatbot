@@ -2,14 +2,14 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot;
 
+use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
 use Kaecyra\ChatBot\Bot\Map\Mappable;
 use Kaecyra\ChatBot\Bot\Map\MappableInterface;
-use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
 
 /**
  * User object

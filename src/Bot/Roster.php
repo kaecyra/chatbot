@@ -2,15 +2,14 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot;
 
-use Kaecyra\ChatBot\Bot\Map\Map;
-
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
+use Kaecyra\ChatBot\Bot\Map\Map;
 
 /**
  * Server roster manager

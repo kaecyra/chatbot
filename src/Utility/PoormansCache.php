@@ -23,6 +23,7 @@ class PoormansCache implements CacheInterface {
         if (!isset(self::$storage[$cacheKey]['value'])) {
             return null;
         } elseif (self::$storage[$cacheKey]['ttl'] > time() ? false : true) {
+            unset(self::$storage[$cacheKey]);
             return false;
         }
 

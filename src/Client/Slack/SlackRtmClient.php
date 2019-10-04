@@ -2,39 +2,32 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack;
 
-use Kaecyra\ChatBot\Client\ClientInterface;
-use Kaecyra\ChatBot\Socket\SocketClient;
-
-use Kaecyra\ChatBot\Socket\MessageInterface;
+use Exception;
+use Kaecyra\ChatBot\Bot\BotUser;
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
 use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
-
+use Kaecyra\ChatBot\Bot\Conversation;
 use Kaecyra\ChatBot\Bot\DestinationInterface;
-use Kaecyra\ChatBot\Bot\User;
-use Kaecyra\ChatBot\Bot\BotUser;
+use Kaecyra\ChatBot\Bot\IO\TextParser;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
 use Kaecyra\ChatBot\Bot\Room;
 use Kaecyra\ChatBot\Bot\Roster;
-use Kaecyra\ChatBot\Bot\Conversation;
-
-use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
-
-use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendUserStrategy;
-use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendRoomStrategy;
+use Kaecyra\ChatBot\Bot\User;
+use Kaecyra\ChatBot\Client\ClientInterface;
 use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendConversationStrategy;
-
+use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendRoomStrategy;
+use Kaecyra\ChatBot\Client\Slack\Strategy\Message\SendUserStrategy;
+use Kaecyra\ChatBot\Socket\MessageInterface;
+use Kaecyra\ChatBot\Socket\SocketClient;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LogLevel;
-
-use React\EventLoop\LoopInterface;
-
 use Ratchet\Client\WebSocket;
-
-use Exception;
+use React\EventLoop\LoopInterface;
 
 /**
  * Slack RTM Client
@@ -144,6 +137,9 @@ class SlackRtmClient extends SocketClient {
         if ($this->settings['rtm']['dsn']) {
             $this->setDSN($this->settings['rtm']['dsn']);
         }
+
+        // Hook into token scanning
+        $this->bind('tokenscan', [$this, 'event_tokenscan']);
 
         // Mark configured
         $this->setState(ClientInterface::STATE_CONFIGURED);
@@ -377,8 +373,7 @@ class SlackRtmClient extends SocketClient {
     public function command_roster_sync(Roster $roster, CommandInterface $command) {
         $this->tLog(LogLevel::INFO, "Roster sync");
 
-        $strategy = $command->strategy;
-        $phase = $strategy->getPhase();
+        $phase = $command['strategy']->getPhase();
         $this->tLog(LogLevel::DEBUG, " sync phase: {phase}", [
             'phase' => $phase
         ]);
@@ -390,12 +385,12 @@ class SlackRtmClient extends SocketClient {
                 // Tell the roster how to update expired rooms and users
                 $roster->setTypeRefreshCallback(Room::getMapType(), function(Room $room) {
                     $command = new SimpleCommand('refresh_room');
-                    $command->room = $room;
+                    $command['room'] = $room;
                     $this->queueCommand($command);
                 });
                 $roster->setTypeRefreshCallback(User::getMapType(), function(User $user) {
                     $command = new SimpleCommand('refresh_user');
-                    $command->user = $user;
+                    $command['user'] = $user;
                     $this->queueCommand($command);
                 });
                 break;
@@ -452,7 +447,7 @@ class SlackRtmClient extends SocketClient {
         }
 
         // Queue up next phase
-        $command->strategy->nextPhase();
+        $command['strategy']->nextPhase();
         $this->queueCommand($command);
     }
 
@@ -463,10 +458,10 @@ class SlackRtmClient extends SocketClient {
      * @param CommandInterface $command
      */
     public function command_refresh_room(Roster $roster, CommandInterface $command) {
-        $roomID = $command->room->getID();
-        if ($command->room->get('is_channel')) {
+        $roomID = $command['room']->getID();
+        if ($command['room']->get('is_channel')) {
             $room = $this->web->channels_info($roomID)->getBody()['channel'];
-        } else if ($command->room->get('is_group')) {
+        } else if ($command['room']->get('is_group')) {
             $room = $this->web->groups_info($roomID)->getBody()['group'];
         }
         $this->ingestRoom($roster, $room);
@@ -505,7 +500,7 @@ class SlackRtmClient extends SocketClient {
      * @param CommandInterface $command
      */
     public function command_refresh_user(Roster $roster, CommandInterface $command) {
-        $userID = $command->user->getID();
+        $userID = $command['user']->getID();
         $user = $this->web->users_info($userID)->getBody()['user'];
         $this->ingestUser($roster, $user);
     }
@@ -539,7 +534,7 @@ class SlackRtmClient extends SocketClient {
      * @param CommandInterface $command
      */
     public function command_get_conversation(Roster $roster, CommandInterface $command) {
-        $userObject = $command->user;
+        $userObject = $command['user'];
         $im = $this->web->im_open($userObject->getID())->getBody()['channel'];
 
         $conversationObject = new Conversation($im['id'], $userObject);
@@ -551,11 +546,10 @@ class SlackRtmClient extends SocketClient {
         ]);
     }
 
-
     public function command_send_message(Roster $roster, CommandInterface $command) {
         $this->tLog(LogLevel::DEBUG, "Send message");
 
-        $strategy = $command->strategy;
+        $strategy = $command['strategy'];
         $phase = $strategy->getPhase();
         $this->tLog(LogLevel::DEBUG, " sync phase: {phase}", [
             'phase' => $phase
@@ -565,25 +559,25 @@ class SlackRtmClient extends SocketClient {
 
             case 'getconversation':
 
-                $userID = $command->destination->getID();
+                $userID = $command['destination']->getID();
                 try {
                     $conversationObject = $roster->getConversation('userid', $userID);
-                    $command->destination = $conversationObject;
-                    $command->strategy->setPhase('sendmessage');
+                    $command['destination'] = $conversationObject;
+                    $command['strategy']->setPhase('sendmessage');
                 } catch (MapNotFoundException $ex) {
                     $getConversationCommand = new SimpleCommand('get_conversation');
-                    $getConversationCommand->user = $command->destination;
+                    $getConversationCommand['user'] = $command['destination'];
                     $this->queueCommand($getConversationCommand);
                     $this->tLog(LogLevel::DEBUG, " requesting new user conversation: {user} ({userid})", [
-                        'user' => $command->destination->getName(),
-                        'userid' => $command->destination->getID()
+                        'user' => $command['destination']->getName(),
+                        'userid' => $command['destination']->getID()
                     ]);
-                    $command->strategy->nextPhase();
+                    $command['strategy']->nextPhase();
                 }
                 break;
 
             case 'waitconversation':
-                $userID = $command->destination->getID();
+                $userID = $command['destination']->getID();
                 try {
                     $conversationObject = $roster->getConversation('userid', $userID);
                 } catch (MapNotFoundException $ex) {
@@ -591,20 +585,20 @@ class SlackRtmClient extends SocketClient {
                     break;
                 }
 
-                $command->destination = $conversationObject;
-                $command->strategy->nextPhase();
+                $command['destination'] = $conversationObject;
+                $command['strategy']->nextPhase();
                 break;
 
             case 'sendmessage':
                 $this->tLog(LogLevel::DEBUG, " sending message: {destid} -> {message}", [
-                    'destid' => $command->destination->getID(),
-                    'message' => $command->message
+                    'destid' => $command['destination']->getID(),
+                    'message' => $command['message']
                 ]);
 
-                if ($command->type == 'message') {
-                    $this->web->chat_post_message($command->destination->getID(), $command->message, $command->attachments, $command->options);
-                } else if ($command->type == 'action') {
-                    $this->web->chat_me_message($command->destination->getID(), $command->message);
+                if ($command['type'] == 'message') {
+                    $this->web->chat_post_message($command['destination']->getID(), $command['message'], $command['attachments'], $command['options']);
+                } else if ($command['type'] == 'action') {
+                    $this->web->chat_me_message($command['destination']->getID(), $command['message']);
                 }
 
                 return;
@@ -629,24 +623,24 @@ class SlackRtmClient extends SocketClient {
         // Prepare message command
         $sendCommand = new SimpleCommand('send_message');
         $sendCommand->setExpiry(20);
-        $sendCommand->format = 'simple';
-        $sendCommand->message = $message;
-        $sendCommand->options = $options;
-        $sendCommand->attachments = $attachments;
-        $sendCommand->destination = $destination;
-        $sendCommand->type = 'message';
+        $sendCommand['format'] = 'simple';
+        $sendCommand['message'] = $message;
+        $sendCommand['options'] = $options;
+        $sendCommand['attachments'] = $attachments;
+        $sendCommand['destination'] = $destination;
+        $sendCommand['type'] = 'message';
 
         // Determine required strategy
         $destinationType = $destination->getMapType();
         switch ($destinationType) {
             case 'User':
-                $sendCommand->strategy = new SendUserStrategy;
+                $sendCommand['strategy'] = new SendUserStrategy;
                 break;
             case 'Room':
-                $sendCommand->strategy = new SendRoomStrategy;
+                $sendCommand['strategy'] = new SendRoomStrategy;
                 break;
             case 'Conversation':
-                $sendCommand->strategy = new SendConversationStrategy;
+                $sendCommand['strategy'] = new SendConversationStrategy;
                 break;
             default:
                 throw new Exception("Unsupported DestinationInterface '{$destinationType}'");
@@ -668,22 +662,22 @@ class SlackRtmClient extends SocketClient {
         // Prepare action command
         $sendCommand = new SimpleCommand('send_message');
         $sendCommand->setExpiry(20);
-        $sendCommand->format = 'simple';
-        $sendCommand->message = $message;
-        $sendCommand->destination = $destination;
-        $sendCommand->type = 'action';
+        $sendCommand['format'] = 'simple';
+        $sendCommand['message'] = $message;
+        $sendCommand['destination'] = $destination;
+        $sendCommand['type'] = 'action';
 
         // Determine required strategy
         $destinationType = $destination->getMapType();
         switch ($destinationType) {
             case 'User':
-                $sendCommand->strategy = new SendUserStrategy;
+                $sendCommand['strategy'] = new SendUserStrategy;
                 break;
             case 'Room':
-                $sendCommand->strategy = new SendRoomStrategy;
+                $sendCommand['strategy'] = new SendRoomStrategy;
                 break;
             case 'Conversation':
-                $sendCommand->strategy = new SendConversationStrategy;
+                $sendCommand['strategy'] = new SendConversationStrategy;
                 break;
             default:
                 throw new Exception("Unsupported DestinationInterface '{$destinationType}'");
@@ -703,6 +697,20 @@ class SlackRtmClient extends SocketClient {
     public function emphasize(string $string): string {
         // Let's make that string bold
         return sprintf("*%s*", $string);
+    }
+
+    /**
+     * Add mentions to parser based on Slack format
+     *
+     * @param TextParser $parser
+     * @param string $part
+     */
+    public function event_tokenscan(TextParser $parser, string $part) {
+        // Check whether we've been given a mention
+        if (preg_match('/<@(U[\A-Z0-9]+)>/', $part, $matches) === 1) {
+            $uid = $matches[1];
+            $parser['mentions'][] = $uid;
+        }
     }
 
 }

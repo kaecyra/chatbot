@@ -2,22 +2,17 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 
+use Kaecyra\ChatBot\Bot\Command\CommandRouter;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
+use Kaecyra\ChatBot\Bot\Roster;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use Kaecyra\ChatBot\Bot\Persona;
-use Kaecyra\ChatBot\Bot\Roster;
-use Kaecyra\ChatBot\Bot\User;
-use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
-
 use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * Users protocol handler
@@ -38,12 +33,11 @@ class Users extends AbstractProtocolHandler {
     /**
      * Handle presence changes
      *
-     * @param Persona $persona
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param MessageInterface $message
-     * @return type
      */
-    public function message_presence_change(Persona $persona, Roster $roster, MessageInterface $message) {
+    public function message_presence_change(CommandRouter $router, Roster $roster, MessageInterface $message) {
         $uid = $message->get('user');
 
         try {
@@ -66,7 +60,7 @@ class Users extends AbstractProtocolHandler {
         ]);
 
         $user->setPresence($presence);
-        $persona->onPresenceChange($user);
+        $router->onPresenceChange($user);
     }
 
 }

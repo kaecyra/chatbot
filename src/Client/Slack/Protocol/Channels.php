@@ -2,24 +2,20 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
+use Kaecyra\ChatBot\Bot\BotUser;
+use Kaecyra\ChatBot\Bot\Command\CommandRouter;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
+use Kaecyra\ChatBot\Bot\Room;
+use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Bot\User;
 use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
-
 use Kaecyra\ChatBot\Client\Slack\WebClientAwareInterface;
 use Kaecyra\ChatBot\Client\Slack\WebClientAwareTrait;
 use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use Kaecyra\ChatBot\Bot\Persona;
-use Kaecyra\ChatBot\Bot\Roster;
-use Kaecyra\ChatBot\Bot\Room;
-use Kaecyra\ChatBot\Bot\User;
-use Kaecyra\ChatBot\Bot\BotUser;
-
-use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
-
 use Psr\Log\LogLevel;
 
 /**
@@ -85,11 +81,12 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
     /**
      * Handle bot leaves
      *
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param BotUser $user
      * @param MessageInterface $message
      */
-    public function message_channel_left(Persona $persona, Roster $roster, BotUser $user, MessageInterface $message) {
+    public function message_channel_left(CommandRouter $router, Roster $roster, BotUser $user, MessageInterface $message) {
         $this->ingestRoom($roster, $message->get('channel'));
         try {
             $roomObject = $roster->getRoom('id', $message->get('channel'));
@@ -99,16 +96,17 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
             ]);
             return;
         }
-        $this->channelLeave($persona, $roomObject, $user);
+        $this->channelLeave($router, $roomObject, $user);
     }
 
     /**
      * Handle joins (for both user and bot)
      *
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param MessageInterface $message
      */
-    public function message_member_joined_channel(Persona $persona, Roster $roster, MessageInterface $message) {
+    public function message_member_joined_channel(CommandRouter $router, Roster $roster, MessageInterface $message) {
         $this->ingestRoom($roster, $message->get('channel'));
         $reason = "";
         try {
@@ -125,16 +123,17 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
             return;
         }
 
-        $this->channelJoin($persona, $roomObject, $userObject, $reason);
+        $this->channelJoin($router, $roomObject, $userObject, $reason);
     }
 
     /**
      * Handle leaves
      *
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param MessageInterface $message
      */
-    public function message_member_left_channel(Persona $persona, Roster $roster, MessageInterface $message) {
+    public function message_member_left_channel(CommandRouter $router, Roster $roster, MessageInterface $message) {
         $this->ingestRoom($roster, $message->get('channel'));
         try {
             $userObject = $roster->getUser('id', $message->get('user'));
@@ -146,7 +145,7 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
             return;
         }
 
-        $this->channelLeave($persona, $roomObject, $userObject);
+        $this->channelLeave($router, $roomObject, $userObject);
     }
 
     /**
@@ -155,12 +154,12 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
      * This method has been abstracted to support multiple avenues of users
      * joining channels in the future.
      *
-     * @param Persona $persona
+     * @param CommandRouter $router
      * @param Room $room
      * @param User $user
      * @param string $reason
      */
-    protected function channelJoin(Persona $persona, Room $room, User $user, string $reason = "") {
+    protected function channelJoin(CommandRouter $router, Room $room, User $user, string $reason = "") {
         $room->addMember($user);
         $this->tLog(LogLevel::INFO, "{name} ({uid}) joined #{channel} ({cid}). {reason}", [
             'name' => $user->getReal(),
@@ -170,7 +169,7 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
             'reason' => $reason
         ]);
 
-        $persona->onJoin($room, $user);
+        $router->onJoin($room, $user);
     }
 
     /**
@@ -179,11 +178,11 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
      * This method has been abstracted to support multiple avenues of users
      * leaving channels in the future.
      *
-     * @param Persona $persona
+     * @param CommandRouter $router
      * @param Room $room
      * @param User $user
      */
-    protected function channelLeave(Persona $persona, Room $room, User $user) {
+    protected function channelLeave(CommandRouter $router, Room $room, User $user) {
         $room->removeMember($user);
         $this->tLog(LogLevel::INFO, "{name} ({uid}) left #{channel} ({cid}).", [
             'name' => $user->getReal(),
@@ -192,7 +191,7 @@ class Channels extends AbstractProtocolHandler implements WebClientAwareInterfac
             'cid' => $room->getID()
         ]);
 
-        $persona->onLeave($room, $user);
+        $router->onLeave($room, $user);
     }
 
     /**

@@ -2,23 +2,17 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
-use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
-use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
-
-use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use Kaecyra\ChatBot\Bot\Persona;
-use Kaecyra\ChatBot\Bot\Roster;
 use Kaecyra\ChatBot\Bot\BotUser;
+use Kaecyra\ChatBot\Bot\Command\CommandRouter;
 use Kaecyra\ChatBot\Bot\Conversation;
-
-use Psr\Log\LogLevel;
-
-use \Exception;
+use Kaecyra\ChatBot\Bot\Map\MapNotFoundException;
+use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
+use Kaecyra\ChatBot\Socket\MessageInterface;
 
 /**
  * Messages protocol handler
@@ -40,10 +34,11 @@ class Messages extends AbstractProtocolHandler {
     /**
      * Receive communication messages (u2u, u2c)
      *
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param MessageInterface $message
      */
-    public function message_message(Persona $persona, Roster $roster, BotUser $bot, MessageInterface $message) {
+    public function message_message(CommandRouter $router, Roster $roster, BotUser $bot, MessageInterface $message) {
         $subtype = $message->get('subtype');
         if ($subtype) {
             return;
@@ -61,7 +56,7 @@ class Messages extends AbstractProtocolHandler {
             case 'G':
                 // Channel message
                 $roomObject = $roster->getRoom('id', $channelID);
-                $persona->onGroupMessage($roomObject, $userObject, $message->get('text'));
+                $router->onGroupMessage($roomObject, $userObject, $message->get('text'));
                 break;
 
             case 'D':
@@ -75,7 +70,7 @@ class Messages extends AbstractProtocolHandler {
                     $roster->map($conversationObject);
                 }
 
-                $persona->onDirectMessage($userObject, $message->get('text'));
+                $router->onDirectMessage($userObject, $message->get('text'));
                 break;
         }
     }
@@ -83,12 +78,12 @@ class Messages extends AbstractProtocolHandler {
     /**
      * Receives user_typing messages
      *
-     * @param Persona $persona
+     * @param CommandRouter $router
      * @param Roster $roster
      * @param BotUser $bot
      * @param MessageInterface $message
      */
-    public function message_user_typing(Persona $persona, Roster $roster, BotUser $bot, MessageInterface $message) {
+    public function message_user_typing(CommandRouter $router, Roster $roster, BotUser $bot, MessageInterface $message) {
         $userObject = $roster->getUser('id', $message->get('user'));
 
         $channelID = $message->get('channel');

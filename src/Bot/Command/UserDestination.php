@@ -2,7 +2,7 @@
 
 /**
  * @license MIT
- * @copyright 2014-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot\Command;
@@ -57,6 +57,13 @@ class UserDestination {
      */
     public function getUser(): UserInterface {
         return $this->user;
+    }
+
+    /**
+     * @return DestinationInterface
+     */
+    public function getDestination(): DestinationInterface {
+        return $this->destination;
     }
 
 }
