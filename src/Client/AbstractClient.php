@@ -2,26 +2,20 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client;
 
-use Kaecyra\ChatBot\Bot\Command\CommandInterface;
-use Kaecyra\ChatBot\Client\AsyncEvent;
-
-use Kaecyra\AppCommon\Store;
-
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
-
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
 use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
+use Kaecyra\AppCommon\Store;
+use Kaecyra\ChatBot\Bot\Command\CommandInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-
 use Psr\Log\LogLevel;
 
 /**

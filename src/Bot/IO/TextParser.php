@@ -2,29 +2,23 @@
 
 /**
  * @license MIT
- * @copyright 2014-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
-namespace Kaecyra\ChatBot\Bot\IO\TextParser;
+namespace Kaecyra\ChatBot\Bot\IO;
+
 use Kaecyra\ChatBot\Bot\Command\CommandInterface;
-use Kaecyra\ChatBot\Bot\Command\InteractiveCommand;
 
 /**
  * Text parser
  *
- * This object implements ArrayAccess so that msot of its contents can be accessed
+ * This object implements ArrayAccess so that most of its contents can be accessed
  * as an array.
  *
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-class TextParser implements \ArrayAccess {
-
-    /**
-     * Parser create time
-     * @var int
-     */
-    protected $createTime;
+class TextParser extends AbstractParser implements \ArrayAccess {
 
     /**
      * Command supplemental data
@@ -33,122 +27,13 @@ class TextParser implements \ArrayAccess {
     protected $data;
 
     /**
-     * Initial input string
-     * @var string
-     */
-    protected $inputString;
-
-    /**
-     * Constructor
-     *
-     * @param string $input
-     * @param array $initial optional
-     */
-    public function __construct(string $input, array $initial = []) {
-        $this->createTime = time();
-
-        if (!is_array($initial)) {
-            $initial = [];
-        }
-
-        $this->setInputString($input, $initial);
-    }
-
-    /**
-     * Get initial command string
-     *
-     * @return string
-     */
-    public function getInputString() {
-        return $this->inputString;
-    }
-
-    /**
-     * Set initial command string
-     *
-     * This method also internally resets the state of the TextCommand so that it is
-     * ready for parsing.
-     *
-     * @param string $inputString
-     * @param array $initial
-     * @return TextParser
-     */
-    public function setInputString(string $inputString, array $initial): TextParser {
-        $this->inputString = $inputString;
-
-        $defaults = [
-            'targets' => [],
-            'toggle' => null,
-            'gather' => false,
-            'consume' => false,
-            'token' => null,
-            'last_token' => null,
-            'tokens' => 0,
-            'parsed' => 0
-        ];
-        $this->data = array_merge($defaults, $initial);
-
-        return $this;
-    }
-
-    /**
-     * Test possible phrase on command string
-     *
-     * @param string $test
-     * @param boolean $case optional. case sensitive. default false
-     * @return boolean
-     */
-    public function match($test, $case = false): bool {
-        $flags = '';
-        if (!$case) {
-            $flags = 'i';
-        }
-        return (boolean)preg_match("`{$test}`{$flags}", $this->getInputString());
-    }
-
-    /**
-     * Test if state has token(s)
-     *
-     * @param array|string $tokens
-     * @param boolean $all optional. require all tokens. default false (any token)
-     */
-    public function have($tokens, $all = false): bool {
-        if (!is_array($this->data['pieces']) || !count($this->data['pieces'])) {
-            return false;
-        }
-
-        if (!is_array($tokens)) {
-            $tokens = [$tokens];
-        }
-
-        foreach ($tokens as $token) {
-            if (in_array($token, $this->data['pieces'])) {
-                if (!$all) {
-                    return true;
-                }
-            } else {
-                if ($all) {
-                    return false;
-                }
-            }
-        }
-
-        // If we get here with $all, we have all tokens
-        if ($all) {
-            return true;
-        }
-
-        // If we get here, we don't have all and we got no tokens
-        return false;
-    }
-
-    /**
      * Internal analyze method
      *
-     * @param InteractiveCommand $command
+     * @param CommandInterface $command
+     * @param MessageWrapper $message
      * @return TextParser
      */
-    public function analyzeFor(InteractiveCommand $command): TextParser {
+    public function parse(CommandInterface $command, MessageWrapper $message): array {
 
         $this->pieces = explode(' ', $this->getInputString());
         $this->parts = $this['pieces'];

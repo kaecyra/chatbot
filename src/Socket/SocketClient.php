@@ -2,23 +2,18 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Socket;
 
-use Kaecyra\ChatBot\Client\ClientInterface;
+use Exception;
 use Kaecyra\ChatBot\Client\AbstractClient;
-use Kaecyra\ChatBot\Socket\MessageInterface;
-
+use Kaecyra\ChatBot\Client\ClientInterface;
 use Psr\Log\LogLevel;
-
-use React\EventLoop\LoopInterface;
-
 use Ratchet\Client\WebSocket;
 use Ratchet\RFC6455\Messaging\MessageInterface as SocketMessageInterface;
-
-use \Exception;
+use React\EventLoop\LoopInterface;
 
 /**
  * Socket Client

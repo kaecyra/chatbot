@@ -2,24 +2,20 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack;
 
+use Exception;
 use Garden\Http\HttpClient;
 use Garden\Http\HttpResponse;
-
+use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
-
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * Slack Web Client

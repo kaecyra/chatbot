@@ -2,21 +2,15 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
-use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
-
-use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use Kaecyra\ChatBot\Bot\Persona;
-use Kaecyra\ChatBot\Bot\Roster;
 use Kaecyra\ChatBot\Bot\Conversation;
-
+use Kaecyra\ChatBot\Bot\Roster;
+use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
+use Kaecyra\ChatBot\Socket\MessageInterface;
 use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * IM protocol handler

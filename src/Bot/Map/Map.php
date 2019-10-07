@@ -2,21 +2,17 @@
 
 /**
  * @license MIT
- * @copyright 2014-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot\Map;
 
+use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
 use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
-
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * Abstract map container

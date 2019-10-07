@@ -2,13 +2,12 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client;
 
 use Kaecyra\ChatBot\Socket\MessageInterface;
-use Ratchet\Client\WebSocket;
 
 /**
  * Client interface

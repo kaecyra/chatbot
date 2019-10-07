@@ -2,12 +2,12 @@
 
 /**
  * @license MIT
- * @copyright 2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Utility;
 
-use \Memcached;
+use Memcached;
 
 /**
  * Cache abstraction

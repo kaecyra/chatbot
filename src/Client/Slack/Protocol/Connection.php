@@ -2,21 +2,16 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 
-use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
-use Kaecyra\ChatBot\Socket\MessageInterface;
-
-use Kaecyra\ChatBot\Client\Slack\Strategy\StartupSyncStrategy;
-
 use Kaecyra\ChatBot\Bot\Command\SimpleCommand;
-
+use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
+use Kaecyra\ChatBot\Client\Slack\Strategy\StartupSyncStrategy;
+use Kaecyra\ChatBot\Socket\MessageInterface;
 use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * Connection protocol handler
@@ -82,7 +77,7 @@ class Connection extends AbstractProtocolHandler {
 
         // Queue boot sync
         $sync = new SimpleCommand('roster_sync');
-        $sync->strategy = new StartupSyncStrategy;
+        $sync['strategy'] = new StartupSyncStrategy;
         $client->queueCommand($sync);
     }
 

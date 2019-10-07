@@ -5,14 +5,14 @@
  * General purpose extensible PHP chat bot for Instant Messaging rooms.
  *
  * @license MIT
- * @copyright 2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  * @author Tim Gunter <tim@vanillaforums.com>
  */
 
 namespace Kaecyra\ChatBot;
 
-use Garden\Daemon\Daemon;
 use Garden\Container\Container;
+use Garden\Daemon\Daemon;
 use Psr\Log\LogLevel;
 
 // Switch to root directory

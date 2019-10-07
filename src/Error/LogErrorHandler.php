@@ -2,15 +2,13 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Error;
 
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
 use Garden\Daemon\ErrorHandlerInterface;
-
+use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
 

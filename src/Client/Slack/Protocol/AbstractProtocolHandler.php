@@ -2,26 +2,19 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Client\Slack\Protocol;
 
-use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
-
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
-use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
-
-use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
-
 use Kaecyra\AppCommon\Event\EventAwareInterface;
 use Kaecyra\AppCommon\Event\EventAwareTrait;
-
+use Kaecyra\AppCommon\Log\LoggerBoilerTrait;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
+use Kaecyra\ChatBot\Client\Slack\SlackRtmClient;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
-use Psr\Log\LogLevel;
-
-use \Exception;
 
 /**
  * Abstract protocol handler

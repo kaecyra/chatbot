@@ -2,12 +2,12 @@
 
 /**
  * @license MIT
- * @copyright 2014-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot\Map;
 
-use \Exception;
+use Exception;
 
 /**
  * Abstract map container

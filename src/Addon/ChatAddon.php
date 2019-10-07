@@ -2,15 +2,16 @@
 
 /**
  * @license MIT
- * @copyright 2014-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Addon;
 
-use Kaecyra\ChatBot\Client\ClientInterface;
-
 use Kaecyra\AppCommon\Addon\AbstractAddon;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogInterface;
+use Kaecyra\AppCommon\Log\Tagged\TaggedLogTrait;
 use Kaecyra\AppCommon\Store;
+use Kaecyra\ChatBot\Client\ClientInterface;
 
 /**
  * Abstract Chat Addon
@@ -18,7 +19,10 @@ use Kaecyra\AppCommon\Store;
  * @author Tim Gunter <tim@vanillaforums.com>
  * @package chatbot
  */
-abstract class ChatAddon extends AbstractAddon {
+abstract class ChatAddon extends AbstractAddon implements TaggedLogInterface, PersonaAwareInterface {
+
+    use TaggedLogTrait;
+    use PersonaAwareTrait;
 
     /**
      * Client

@@ -2,18 +2,14 @@
 
 /**
  * @license MIT
- * @copyright 2016-2017 Tim Gunter
+ * @copyright 2010-2019 Tim Gunter
  */
 
 namespace Kaecyra\ChatBot\Bot;
 
+use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
 use Kaecyra\ChatBot\Bot\Map\Mappable;
 use Kaecyra\ChatBot\Bot\Map\MappableInterface;
-use Kaecyra\ChatBot\Bot\Map\DataAccessTrait;
-
-use Kaecyra\ChatBot\Bot\Conversation;
-
-use Kaecyra\ChatBot\Bot\DestinationInterface;
 
 /**
  * User object
@@ -86,7 +82,7 @@ class User extends Mappable implements UserInterface, DestinationInterface {
      * @param string $name
      * @return User
      */
-    public function setName(string $name): User {
+    public function setName(string $name): UserInterface {
         $this->name = $name;
         return $this;
     }
