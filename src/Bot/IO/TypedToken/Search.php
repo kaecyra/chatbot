@@ -18,9 +18,7 @@ namespace Kaecyra\ChatBot\Bot\IO\TypedToken;
 class Search extends AbstractTypedToken {
 
     /**
-     * Validating a parameter as a timespan
-     *
-     * Format should be {1,3} (day|days|week|weeks|month|months|year|years)
+     * Validating a parameter as a "search"
      *
      * @param string $token
      * @param string $prevToken
