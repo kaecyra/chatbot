@@ -443,7 +443,7 @@ class CommandRouter implements LoggerAwareInterface, EventAwareInterface, Tagged
      *
      */
     public function expireCommands() {
-        $this->tLog(LogLevel::INFO, "{count} pending commands", [
+        $this->tLog(LogLevel::DEBUG, "{count} pending commands", [
             'count' => count($this->commands)
         ]);
         foreach ($this->commands as $command) {
