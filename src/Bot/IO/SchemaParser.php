@@ -220,43 +220,52 @@ class SchemaParser extends AbstractParser {
      * @return array
      */
     protected function parseTypedTokens(CommandInterface $command, ParserResponse $response, array $commandTokens, $bustCache = false): array {
-
         // Iterate over all known schema TypedTokens
         foreach ($this->schema['typedTokens'] as $schemaIndex => &$tokenSchema) {
-            /** @var AbstractTypedToken $typedToken */
-            $typedToken = $this->container->get($tokenSchema['type']);
-            if ($bustCache) {
-                $typedToken->flush();
+            $typedTokens = [];
+
+            if (is_array($tokenSchema['type'])) {
+                foreach ($tokenSchema['type'] as $type) {
+                    $typedTokens[] = $this->container->get($type);
+                }
+            } else {
+                $typedTokens[] = $this->container->get($tokenSchema['type']);
             }
 
-            // Iterate over input tokens
-            $prevToken = null;
-            foreach ($commandTokens as $tokenIndex => $commandToken) {
-
-                try {
-
-                    // Test input token against current TypedToken
-                    $valid = $typedToken->validateToken($commandToken, $prevToken, $tokenSchema);
-                    if ($valid !== false) {
-                        $this->tLog(LogLevel::INFO, "Matched TypedToken {typed} -> {value}", [
-                            'typed' => $schemaIndex,
-                            'value' => $valid
-                        ]);
-                        $tokenSchema['satisfied'] = true;
-                        unset($commandTokens[$tokenIndex]);
-                        $command->addTarget($schemaIndex, $valid);
-                    }
-                } catch (TokenFormatException $e) {
-
-                    // Only send errors and discard tokens when the cache is being busted (round 2)
-                    if ($bustCache) {
-                        $response->addError($e->getMessage(), [
-                            $e->getToken()
-                        ]);
-                        unset($commandTokens[$tokenIndex]);
-                    }
+            /** @var AbstractTypedToken $typedToken */
+            foreach ($typedTokens as $typedToken) {
+                if ($bustCache) {
+                    $typedToken->flush();
                 }
-                $prevToken = $commandToken;
+
+                // Iterate over input tokens
+                $prevToken = null;
+                foreach ($commandTokens as $tokenIndex => $commandToken) {
+                    try {
+
+                        // Test input token against current TypedToken
+                        $valid = $typedToken->validateToken($commandToken, $prevToken, $tokenSchema);
+                        if ($valid !== false) {
+                            $this->tLog(LogLevel::INFO, "Matched TypedToken {typed} -> {value}", [
+                                'typed' => $schemaIndex,
+                                'value' => $valid
+                            ]);
+                            $tokenSchema['satisfied'] = true;
+                            unset($commandTokens[$tokenIndex]);
+                            $command->addTarget($schemaIndex, $valid);
+                        }
+                    } catch (TokenFormatException $e) {
+
+                        // Only send errors and discard tokens when the cache is being busted (round 2)
+                        if ($bustCache) {
+                            $response->addError($e->getMessage(), [
+                                $e->getToken()
+                            ]);
+                            unset($commandTokens[$tokenIndex]);
+                        }
+                    }
+                    $prevToken = $commandToken;
+                }
             }
         }
 
@@ -299,10 +308,28 @@ class SchemaParser extends AbstractParser {
                 continue;
             }
             $tokenSchema = $this->schema['typedTokens'][$tokenIndex];
-            $typedToken = $this->container->get($tokenSchema['type']);
-            $exemplars['format'] = str_replace("{{$tokenIndex}}", "{{$tokenIndex}:{$typedToken->getExample()}}", $exemplars['format']);
-            $exemplars['example'] = str_replace("{{$tokenIndex}}", $typedToken->getExample(), $exemplars['example']);
+            $typedTokens = [];
+
+            if (is_array($tokenSchema['type'])) {
+                foreach ($tokenSchema['type'] as $type) {
+                    $typedTokens[] = $this->container->get($type);
+                }
+
+                $example = [];
+                foreach ($typedTokens as $typedToken) {
+                    $example[] = $typedToken->getExample();
+                }
+
+                $example = implode(' or ', $example);
+            } else {
+                $typedTokens[] = $this->container->get($tokenSchema['type']);
+                $example = $typedTokens[0]->getExample();
+            }
+
+            $exemplars['format'] = str_replace("{{$tokenIndex}}", "{{$tokenIndex}:$example}", $exemplars['format']);
+            $exemplars['example'] = str_replace("{{$tokenIndex}}", $example, $exemplars['example']);
         }
+
         return $exemplars;
     }
 
