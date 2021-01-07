@@ -23,12 +23,14 @@ class SchemaParser extends AbstractParser {
 
     /**
      * Command schema
+     *
      * @var array
      */
     protected $schema;
 
     /**
      * Number of parses
+     *
      * @var int
      */
     protected $parses;
@@ -61,6 +63,7 @@ class SchemaParser extends AbstractParser {
         if (!array_key_exists('typedTokens', $this->schema)) {
             $this->schema['typedTokens'] = [];
         }
+
         return $this;
     }
 
@@ -87,7 +90,7 @@ class SchemaParser extends AbstractParser {
             'message' => $message->getMessage(),
             'parses' => $this->parses,
             'command' => $command->getCommand(),
-            'guid' => $command->getGuid()
+            'guid' => $command->getGuid(),
         ]);
 
         $commandString = trim($message->getMessage());
@@ -98,6 +101,7 @@ class SchemaParser extends AbstractParser {
         // Allow cancels
         if ($message->oneof(['no', 'no thanks', 'nevermind', 'stop', 'oops', 'abort', 'cancel', 'forget it', 'forget about it'])) {
             $response->setStatus(ParserResponse::STATUS_CANCEL);
+
             return $response;
         }
 
@@ -108,6 +112,7 @@ class SchemaParser extends AbstractParser {
             } else {
                 $response->setStatus(ParserResponse::STATUS_OK_CONFIRM);
             }
+
             return $response;
         }
 
@@ -119,9 +124,10 @@ class SchemaParser extends AbstractParser {
             // If any remain, the command is invalid and we directly fail out without any continue
             if (!$valid) {
                 $response->addError("Badly formatted %s.", [
-                    $command->getCommand()
+                    $command->getCommand(),
                 ]);
                 $response->addError("I expected something like: {$exemplars['format']}");
+
                 return $response;
             }
         }
@@ -160,7 +166,7 @@ class SchemaParser extends AbstractParser {
             $response->clearErrors();
 
             $response->addError("Working on that %s for you.", [
-                $command->getCommand()
+                $command->getCommand(),
             ]);
             $response->addError("I expected something like: {$exemplars['format']}");
 
@@ -170,7 +176,7 @@ class SchemaParser extends AbstractParser {
                     $missing[] = $tokenIndex;
                 }
             }
-            $toks = count($missing) > 1 ? "the " . implode(", ", array_fill(0, count($missing) -1, "%s")) . " and %s" : "the %s";
+            $toks = count($missing) > 1 ? "the ".implode(", ", array_fill(0, count($missing) - 1, "%s"))." and %s" : "the %s";
             $response->addError("Please give me {$toks}", $missing);
 
             // Re-add typed token errors to response
@@ -205,6 +211,7 @@ class SchemaParser extends AbstractParser {
                 $commandString = trim(preg_replace("~\s?{$schemaToken}~i", '', $commandString, 1));
             }
         }
+
         return $i == count($this->schema['exactTokens']);
     }
 
@@ -223,8 +230,9 @@ class SchemaParser extends AbstractParser {
         // Iterate over all known schema TypedTokens
         foreach ($this->schema['typedTokens'] as $schemaIndex => &$tokenSchema) {
             $typedTokens = [];
+            $multi = is_array($tokenSchema['type']);
 
-            if (is_array($tokenSchema['type'])) {
+            if ($multi) {
                 foreach ($tokenSchema['type'] as $type) {
                     $typedTokens[] = $this->container->get($type);
                 }
@@ -240,31 +248,37 @@ class SchemaParser extends AbstractParser {
 
                 // Iterate over input tokens
                 $prevToken = null;
+                $matched = 0;
+                $limit = $tokenSchema['match'] ?? 1;
+
                 foreach ($commandTokens as $tokenIndex => $commandToken) {
-                    try {
+                    if ($matched < $limit) {
+                        try {
 
-                        // Test input token against current TypedToken
-                        $valid = $typedToken->validateToken($commandToken, $prevToken, $tokenSchema);
-                        if ($valid !== false) {
-                            $this->tLog(LogLevel::INFO, "Matched TypedToken {typed} -> {value}", [
-                                'typed' => $schemaIndex,
-                                'value' => $valid
-                            ]);
-                            $tokenSchema['satisfied'] = true;
-                            unset($commandTokens[$tokenIndex]);
-                            $command->addTarget($schemaIndex, $valid);
-                        }
-                    } catch (TokenFormatException $e) {
+                            // Test input token against current TypedToken
+                            $valid = $typedToken->validateToken($commandToken, $prevToken, $tokenSchema);
+                            if ($valid !== false) {
+                                $this->tLog(LogLevel::INFO, "Matched TypedToken {typed} -> {value}", [
+                                    'typed' => $schemaIndex,
+                                    'value' => $valid,
+                                ]);
+                                $tokenSchema['satisfied'] = true;
+                                unset($commandTokens[$tokenIndex]);
+                                $command->addTarget($schemaIndex, $multi ? ['token' => $valid, 'type' => $typedToken] : $valid, $multi);
+                                $matched++;
+                            }
+                        } catch (TokenFormatException $e) {
 
-                        // Only send errors and discard tokens when the cache is being busted (round 2)
-                        if ($bustCache) {
-                            $response->addError($e->getMessage(), [
-                                $e->getToken()
-                            ]);
-                            unset($commandTokens[$tokenIndex]);
+                            // Only send errors and discard tokens when the cache is being busted (round 2)
+                            if ($bustCache) {
+                                $response->addError($e->getMessage(), [
+                                    $e->getToken(),
+                                ]);
+                                unset($commandTokens[$tokenIndex]);
+                            }
                         }
+                        $prevToken = $commandToken;
                     }
-                    $prevToken = $commandToken;
                 }
             }
         }
@@ -283,6 +297,7 @@ class SchemaParser extends AbstractParser {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -292,6 +307,7 @@ class SchemaParser extends AbstractParser {
      *   'format' => ''
      *   'example' => ''
      * ]
+     *
      * @return array
      */
     public function getExemplars(): array {
@@ -300,7 +316,7 @@ class SchemaParser extends AbstractParser {
 
         $exemplars = [
             'format' => $commandStr,
-            'example' => $commandStr
+            'example' => $commandStr,
         ];
 
         foreach ($matches[1] as $tokenIndex) {
@@ -348,6 +364,7 @@ class SchemaParser extends AbstractParser {
             }
             $commandStr = str_replace("{{$tokenIndex}}", $command->getTarget($tokenIndex), $commandStr);
         }
+
         return $commandStr;
     }
 
