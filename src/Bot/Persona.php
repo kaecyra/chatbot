@@ -140,8 +140,8 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             "Good news {mention}, {message}.",
             "You can breathe again {mention}, {message}.",
             "FYI {mention}, {message}.",
-            "P.S. {mention}, {message}",
-            "Hey {mention}, just letting you know {message}",
+            "P.S. {mention}, {message}.",
+            "Hey {mention}, just letting you know {message}.",
         ]);
         $mention = $this->getUserReference($user);
         return str_replace(['{mention}', '{message}'], [$mention, preg_replace('/^i([\' ])/', 'I$1', lcfirst($message))], $bacon);
