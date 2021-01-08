@@ -86,6 +86,10 @@ class Persona implements LoggerAwareInterface, EventAwareInterface, TaggedLogInt
             "Yikes {mention}, {error}. C'est la vie.",
             "{mention} you donut, {error}.",
             "Damn it {mention}, {error}!",
+            "Wow, nice work {mention}. {error}...",
+            "Way to go {mention}, {error}.",
+            "See what you made me do {mention}!? {error}.",
+            "{error} {mention}. Get it together, ok?",
         ]);
         $mention = $this->getUserReference($user);
         return str_replace(['{mention}', '{error}'], [$mention, preg_replace('/^i([\' ])/', 'I$1', lcfirst($error))], $bacon);
