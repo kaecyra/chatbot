@@ -362,7 +362,16 @@ class SchemaParser extends AbstractParser {
             if (!array_key_exists($tokenIndex, $this->schema['typedTokens'])) {
                 continue;
             }
-            $commandStr = str_replace("{{$tokenIndex}}", $command->getTarget($tokenIndex), $commandStr);
+
+            // When using commands that allow an array of parameters, getTarget returns an array with only the passed
+            //  index that we need to grab the data from. This isn't the cleanest solution but the chatbot is not built
+            //  with this functionality originally in mind, and this solution handles the problem quickly.
+            $target = $command->getTarget($tokenIndex);
+            if (is_array($target)) {
+                $target = $target[0]['token'];
+            }
+
+            $commandStr = str_replace("{{$tokenIndex}}", $target, $commandStr);
         }
 
         return $commandStr;
